@@ -22,11 +22,13 @@ import {
   getTodayForecast,
   login,
   logout,
+  resendVerification,
   recordActualDaily,
   register,
   setStoredRefreshToken,
   setStoredToken,
   updateNotificationPreferences,
+  verifyEmail,
 } from "./api";
 import { getDateDaysAgo, getHistoryRowKey, getHourlyDistribution, getTodayLocalDate, getWeatherRisk } from "./utils";
 import AccountSection from "./components/AccountSection";
@@ -36,6 +38,8 @@ import ForecastSection from "./components/ForecastSection";
 import HistorySection from "./components/HistorySection";
 import IntegrationSection from "./components/IntegrationSection";
 import ProfileSection from "./components/ProfileSection";
+import LandingVideo from "./components/LandingVideo";
+import LandingFooter from "./components/LandingFooter";
 
 const emptyRegisterForm = {
   name: "",
@@ -46,6 +50,11 @@ const emptyRegisterForm = {
 const emptyLoginForm = {
   email: "",
   password: "",
+};
+
+const emptyVerifyForm = {
+  email: "",
+  code: "",
 };
 
 const emptyProfileForm = {
@@ -82,6 +91,8 @@ const emptyNotificationPreference = {
   preferred_send_time: "06:00:00",
 };
 
+const onboardingModalSnoozeMs = 24 * 60 * 60 * 1000;
+
 // App renders auth and dashboard flows with user-separated data.
 export default function App() {
   const [token, setToken] = useState(getStoredToken());
@@ -106,6 +117,8 @@ export default function App() {
 
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginForm, setLoginForm] = useState(emptyLoginForm);
+  const [verifyForm, setVerifyForm] = useState(emptyVerifyForm);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [profileForm, setProfileForm] = useState(emptyProfileForm);
   const [actualForm, setActualForm] = useState(emptyActualForm);
   const [editingProfileID, setEditingProfileID] = useState("");
@@ -140,8 +153,11 @@ export default function App() {
   const [error, setError] = useState("");
   const [currentPage, setCurrentPage] = useState("dashboard");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const feedbackTimeoutRef = useRef(null);
   const feedbackFadeRef = useRef(null);
+  const logoutTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!token) {
@@ -228,6 +244,12 @@ export default function App() {
     };
   }, [feedback]);
 
+  useEffect(() => {
+    return () => {
+      clearTimeout(logoutTimeoutRef.current);
+    };
+  }, []);
+
   // Pre-fill form when profile is loaded
   useEffect(() => {
     if (profile) {
@@ -291,6 +313,24 @@ export default function App() {
       } catch {
         setHeartbeatSummary(null);
       }
+
+      try {
+        const result = await getNotificationPreferences();
+        setNotificationPreference({
+          plan_tier: result.plan_tier || "free",
+          primary_channel: result.primary_channel || "email",
+          email_enabled: Boolean(result.email_enabled),
+          telegram_enabled: Boolean(result.telegram_enabled),
+          whatsapp_enabled: Boolean(result.whatsapp_enabled),
+          telegram_chat_id: result.telegram_chat_id || "",
+          whatsapp_phone_e164: result.whatsapp_phone_e164 || "",
+          whatsapp_opted_in: Boolean(result.whatsapp_opted_in),
+          timezone: result.timezone || "Asia/Jakarta",
+          preferred_send_time: result.preferred_send_time || "06:00:00",
+        });
+      } catch {
+        setNotificationPreference(emptyNotificationPreference);
+      }
     } catch (loadError) {
       setError(loadError.message);
       handleClientLogout(false);
@@ -329,11 +369,7 @@ export default function App() {
     }
   }
 
-  function handleClientLogout(callApi = true) {
-    if (callApi) {
-      logout().catch(() => null);
-    }
-
+  function resetClientSessionState() {
     setStoredToken("");
     setStoredRefreshToken("");
     setToken("");
@@ -357,6 +393,8 @@ export default function App() {
     setLatestDeviceKey("");
     setRegisterForm(emptyRegisterForm);
     setLoginForm(emptyLoginForm);
+    setVerifyForm(emptyVerifyForm);
+    setPendingVerificationEmail("");
     setProfileForm(emptyProfileForm);
     setActualForm(emptyActualForm);
     setEditingProfileID("");
@@ -368,6 +406,29 @@ export default function App() {
     setFeedback("");
     setError("");
     setAuthPage("landing");
+    setShowOnboardingModal(false);
+    setIsLoggingOut(false);
+  }
+
+  function handleClientLogout(callApi = true, smoothTransition = callApi) {
+    if (callApi) {
+      logout().catch(() => null);
+    }
+
+    if (!smoothTransition) {
+      resetClientSessionState();
+      return;
+    }
+
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    clearTimeout(logoutTimeoutRef.current);
+    logoutTimeoutRef.current = setTimeout(() => {
+      resetClientSessionState();
+    }, 180);
   }
 
   async function loadNotificationPreference() {
@@ -430,13 +491,53 @@ export default function App() {
 
     try {
       const payload = await register(registerForm);
+      const verifiedEmail = payload?.user?.email || registerForm.email;
+      setPendingVerificationEmail(verifiedEmail);
+      setVerifyForm({ email: verifiedEmail, code: "" });
+      setAuthPage("verify-email");
+      setRegisterForm(emptyRegisterForm);
+      setFeedback(payload.message || "Akun berhasil dibuat. Silakan cek email untuk kode verifikasi.");
+    } catch (authError) {
+      setError(authError.message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
+
+  async function handleVerifyEmail(event) {
+    event.preventDefault();
+    setIsAuthLoading(true);
+    setError("");
+    setFeedback("");
+
+    try {
+      const payload = await verifyEmail({
+        email: verifyForm.email,
+        code: verifyForm.code,
+      });
       setStoredToken(payload.access_token);
       setStoredRefreshToken(payload.refresh_token);
       setToken(payload.access_token);
-      setRegisterForm(emptyRegisterForm);
-      setFeedback(`Akun ${payload.user.name} berhasil dibuat dan login.`);
+      setVerifyForm(emptyVerifyForm);
+      setPendingVerificationEmail("");
+      setFeedback(`Verifikasi berhasil. Selamat datang ${payload.user.name}.`);
     } catch (authError) {
       setError(authError.message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setIsAuthLoading(true);
+    setError("");
+    setFeedback("");
+
+    try {
+      await resendVerification({ email: verifyForm.email || pendingVerificationEmail });
+      setFeedback("Kode verifikasi baru sudah dikirim ke email Anda.");
+    } catch (resendError) {
+      setError(resendError.message);
     } finally {
       setIsAuthLoading(false);
     }
@@ -572,8 +673,10 @@ export default function App() {
     setFeedback("");
 
     try {
+      const resolvedSolarProfileID = selectedForecastProfileID || forecast?.solar_profile_id || undefined;
+
       await recordActualDaily({
-        solar_profile_id: selectedForecastProfileID || undefined,
+        solar_profile_id: resolvedSolarProfileID,
         date: actualForm.date,
         actual_kwh: Number(actualForm.actual_kwh),
         source: actualForm.source,
@@ -789,30 +892,139 @@ export default function App() {
     }
   }
 
+  const hasProfile = profiles.length > 0;
+  const hasForecastToday = Boolean(todayForecastDashboard?.date || forecast?.date);
+  const hasActual = actualHistory.length > 0;
+  const hasNotificationConfigured =
+    Boolean(notificationPreference?.preferred_send_time) &&
+    Boolean(notificationPreference?.timezone) &&
+    (Boolean(notificationPreference?.email_enabled) || Boolean(notificationPreference?.telegram_enabled) || Boolean(notificationPreference?.whatsapp_enabled));
+
+  const onboardingSteps = [
+    {
+      key: "profile",
+      title: "1. Isi Solar Profile",
+      done: hasProfile,
+      page: "profile",
+    },
+    {
+      key: "forecast",
+      title: "2. Ambil Forecast Hari Ini",
+      done: hasForecastToday,
+      page: "forecast",
+    },
+    {
+      key: "actual",
+      title: "3. Input Actual Pertama",
+      done: hasActual,
+      page: "forecast",
+    },
+    {
+      key: "notification",
+      title: "4. Review Notifikasi Otomatis",
+      done: hasNotificationConfigured,
+      page: "account",
+    },
+  ];
+
+  const completedOnboardingSteps = onboardingSteps.filter((step) => step.done).length;
+
+  useEffect(() => {
+    if (!token || !currentUser?.id || isLoading) {
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = `solar_forecast_onboarding_shown_${currentUser.id}`;
+    const storedValue = window.localStorage.getItem(storageKey);
+    let canShow = true;
+
+    if (storedValue) {
+      // Backward compatibility: previous implementation stored "1" permanently.
+      if (storedValue === "1") {
+        canShow = true;
+      } else {
+        try {
+          const parsed = JSON.parse(storedValue);
+          const hiddenUntil = Number(parsed?.hidden_until || 0);
+          canShow = !hiddenUntil || Date.now() >= hiddenUntil;
+        } catch {
+          canShow = true;
+        }
+      }
+    }
+
+    if (canShow && completedOnboardingSteps < onboardingSteps.length) {
+      setShowOnboardingModal(true);
+    }
+  }, [token, currentUser?.id, isLoading, completedOnboardingSteps, onboardingSteps.length]);
+
+  function dismissOnboardingModal() {
+    if (typeof window !== "undefined" && currentUser?.id) {
+      const storageKey = `solar_forecast_onboarding_shown_${currentUser.id}`;
+      window.localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          hidden_until: Date.now() + onboardingModalSnoozeMs,
+        }),
+      );
+    }
+    setShowOnboardingModal(false);
+  }
+
   if (!token) {
     return (
-      <AuthFlow
-        authPage={authPage}
-        setAuthPage={setAuthPage}
-        error={error}
-        setError={setError}
-        feedback={feedback}
-        setFeedback={setFeedback}
-        feedbackFading={feedbackFading}
-        isAuthLoading={isAuthLoading}
-        registerForm={registerForm}
-        setRegisterForm={setRegisterForm}
-        handleRegister={handleRegister}
-        loginForm={loginForm}
-        setLoginForm={setLoginForm}
-        handleLogin={handleLogin}
-        simCapacity={simCapacity}
-        setSimCapacity={setSimCapacity}
-        simCloudCover={simCloudCover}
-        setSimCloudCover={setSimCloudCover}
-        simTimePreset={simTimePreset}
-        setSimTimePreset={setSimTimePreset}
-      />
+      <>
+        <AuthFlow
+          authPage={authPage}
+          setAuthPage={setAuthPage}
+          error={error}
+          setError={setError}
+          feedback={feedback}
+          setFeedback={setFeedback}
+          feedbackFading={feedbackFading}
+          isAuthLoading={isAuthLoading}
+          registerForm={registerForm}
+          setRegisterForm={setRegisterForm}
+          handleRegister={handleRegister}
+          loginForm={loginForm}
+          setLoginForm={setLoginForm}
+          handleLogin={handleLogin}
+          verifyForm={verifyForm}
+          setVerifyForm={setVerifyForm}
+          pendingVerificationEmail={pendingVerificationEmail}
+          handleVerifyEmail={handleVerifyEmail}
+          handleResendVerification={handleResendVerification}
+          simCapacity={simCapacity}
+          setSimCapacity={setSimCapacity}
+          simCloudCover={simCloudCover}
+          setSimCloudCover={setSimCloudCover}
+          simTimePreset={simTimePreset}
+          setSimTimePreset={setSimTimePreset}
+        />
+        {/* Only show video and footer on landing page (authPage === 'landing') */}
+        {authPage === "landing" && (
+          <>
+            <LandingVideo />
+            <LandingFooter />
+          </>
+        )}
+      </>
+    );
+  }
+
+  if (isLoading && !currentUser) {
+    return (
+      <div className='auth-transition-screen' role='status' aria-live='polite'>
+        <div className='auth-transition-card'>
+          <div className='auth-transition-spinner' aria-hidden='true' />
+          <strong>Menyiapkan dashboard Anda...</strong>
+          <span>Memuat profil, forecast, dan preferensi notifikasi.</span>
+        </div>
+      </div>
     );
   }
 
@@ -884,7 +1096,7 @@ export default function App() {
       : [];
 
   return (
-    <div className={`app-with-sidebar ${isSidebarOpen ? "sidebar-open" : ""}`}>
+    <div className={`app-with-sidebar ${isSidebarOpen ? "sidebar-open" : ""} ${isLoggingOut ? "app-fading-out" : ""}`}>
       {isSidebarOpen && <button className='sidebar-backdrop' type='button' aria-label='Tutup sidebar' onClick={() => setIsSidebarOpen(false)} />}
       <aside className='sidebar'>
         <div className='sidebar-header'>
@@ -977,7 +1189,18 @@ export default function App() {
 
         <div className='content-area'>
           {currentPage === "dashboard" && (
-            <DashboardSection heartbeatSummary={heartbeatSummary} summary={summary} dashboardForecastHistory={dashboardForecastHistory} dashboardActualHistory={dashboardActualHistory} todayForecast={todayForecastDashboard} activeProfile={profile} />
+            <DashboardSection
+              heartbeatSummary={heartbeatSummary}
+              summary={summary}
+              dashboardForecastHistory={dashboardForecastHistory}
+              dashboardActualHistory={dashboardActualHistory}
+              todayForecast={todayForecastDashboard}
+              activeProfile={profile}
+              profiles={profiles}
+              actualHistory={actualHistory}
+              notificationPreference={notificationPreference}
+              onNavigate={handleNavigate}
+            />
           )}
 
           {currentPage === "profile" && (
@@ -1078,6 +1301,40 @@ export default function App() {
             />
           )}
         </div>
+
+        {showOnboardingModal && (
+          <div className='onboarding-modal-overlay' role='dialog' aria-modal='true' aria-label='Panduan langkah awal'>
+            <section className='onboarding-modal-card'>
+              <h2>Mulai dari Sini</h2>
+              <p>Agar tidak bingung, selesaikan langkah berikut secara berurutan. Setelah itu penggunaan harian akan jauh lebih mudah.</p>
+              <div className='onboarding-modal-progress'>
+                <strong>
+                  {completedOnboardingSteps}/{onboardingSteps.length} langkah selesai
+                </strong>
+              </div>
+
+              <div className='onboarding-modal-list'>
+                {onboardingSteps.map((step) => (
+                  <button
+                    key={step.key}
+                    type='button'
+                    className={`onboarding-modal-item ${step.done ? "done" : ""}`}
+                    onClick={() => {
+                      dismissOnboardingModal();
+                      handleNavigate(step.page);
+                    }}>
+                    <span className='onboarding-modal-item-title'>{step.title}</span>
+                    <span className='onboarding-modal-item-status'>{step.done ? "Selesai" : "Belum"}</span>
+                  </button>
+                ))}
+              </div>
+
+              <button className='secondary-button onboarding-modal-close' type='button' onClick={dismissOnboardingModal}>
+                Tutup
+              </button>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );

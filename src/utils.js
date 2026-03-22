@@ -95,3 +95,27 @@ export function getHourlyDistribution(dateInput, latitude, weatherFactor) {
     { label: "Sore", share: afternoon / safeSum },
   ];
 }
+
+// getEmissionFactor estimates grid emission factor (kgCO2/kWh) based on latitude and longitude bounding boxes for Indonesia.
+// Angka didasarkan pada perkiraan rentang publikasi Kementerian ESDM untuk sistem grid lokal.
+export function getEmissionFactor(lat, lng) {
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return 0.85;
+
+  // Jawa, Madura, Bali (Jamali) - sangat padat PLTU
+  if (lat >= -9.0 && lat <= -5.0 && lng >= 105.0 && lng <= 116.0) return 0.85;
+
+  // Sumatera
+  if (lat >= -6.0 && lat <= 6.0 && lng >= 95.0 && lng <= 106.0) return 0.75;
+
+  // Kalimantan
+  if (lat >= -4.0 && lat <= 5.0 && lng >= 108.0 && lng <= 119.0) return 0.80;
+
+  // Sulawesi (Grid lokal mulai mix PLTA/PLTB)
+  if (lat >= -6.0 && lat <= 2.0 && lng >= 118.0 && lng <= 125.0) return 0.65;
+
+  // Nusa Tenggara, Maluku, Papua
+  if (lat >= -11.0 && lat <= 0.0 && lng >= 125.0 && lng <= 141.0) return 0.70;
+
+  // Default rata-rata nasional
+  return 0.78;
+}

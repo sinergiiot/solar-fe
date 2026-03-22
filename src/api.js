@@ -1,4 +1,4 @@
-const API_BASE_URL = "";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const TOKEN_KEY = "solar_forecast_token";
 const REFRESH_TOKEN_KEY = "solar_forecast_refresh_token";
 
@@ -87,9 +87,25 @@ async function request(path, options = {}, isRetry = false) {
   return payload;
 }
 
-// register creates a user account and receives access + refresh tokens.
+// register creates a user account and triggers email verification code delivery.
 export function register(input) {
   return request("/auth/register", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// verifyEmail confirms OTP code and receives access + refresh tokens.
+export function verifyEmail(input) {
+  return request("/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// resendVerification requests a new OTP verification code.
+export function resendVerification(input) {
+  return request("/auth/resend-verification", {
     method: "POST",
     body: JSON.stringify(input),
   });
