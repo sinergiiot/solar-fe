@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
+import { FiAlertCircle, FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
 import { formatDateID, formatIDR, getHourlyDistribution } from "../utils";
 
 // DashboardSection renders heartbeat, summary, and latest 7-day snapshot tables.
@@ -137,8 +137,26 @@ export default function DashboardSection({
     </span>
   );
 
+  const soilingProfiles = profiles.filter(p => p.soiling_alert_active);
+
   return (
     <>
+      {soilingProfiles.length > 0 && (
+        <section className='panel panel-wide' style={{ background: 'linear-gradient(135deg, #fff5f5 0%, #fed7d7 100%)', borderColor: '#feb2b2', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start', padding: '12px' }}>
+            <div style={{ background: '#f44336', color: 'white', padding: '12px', borderRadius: '12px', display: 'flex' }}>
+              <FiAlertCircle size={24} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, color: '#9b2c2c', fontSize: '1.1rem' }}>Deteksi Penurunan Efisiensi (Soiling)</h3>
+              <p style={{ margin: '4px 0 0', color: '#c53030', fontSize: '0.9rem' }}>
+                AI kami mendeteksi penurunan produksi yang tidak wajar pada site: <strong>{soilingProfiles.map(p => p.site_name).join(", ")}</strong>. 
+                Panel Anda mungkin kotor (debu/kotoran) atau tertutup bayangan. Disarankan melakukan pengecekan atau pembersihan fisik.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
       {!isAllDone && (
         <section className={`panel panel-wide onboarding-panel ${isOnboardingCollapsed ? 'collapsed' : ''}`}>
           <div className='panel-heading onboarding-header' onClick={() => setIsOnboardingCollapsed(!isOnboardingCollapsed)}>
@@ -356,6 +374,15 @@ export default function DashboardSection({
             </div>
             <strong className='dashboard-highlight-value'>{sourceTotal > 0 ? `${iotPercent.toFixed(0)}% IoT` : "--"}</strong>
             <p>{sourceTotal > 0 ? `${sourceStats.iot} dari ${sourceTotal} hari memakai input IoT.` : "Belum ada data actual untuk menilai kualitas sumber."}</p>
+          </article>
+
+          <article className='dashboard-highlight-card'>
+            <div className='dashboard-highlight-top'>
+              <span>Akumulasi Energi (REC)</span>
+              <FiCheckCircle />
+            </div>
+            <strong className='dashboard-highlight-value'>{summary?.total_mwh !== undefined ? `${summary.total_mwh.toFixed(3)} MWh` : "--"}</strong>
+            <p>1 REC = 1 MWh. Kumpulkan MWh untuk kesiapan REC.</p>
           </article>
         </div>
       </section>

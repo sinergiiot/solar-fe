@@ -22,7 +22,12 @@ export default function HistorySection({
   selectedHistoryRisk,
   selectedHistoryHourly,
   electricityTariff,
+  historyPage,
+  historyTotalCount,
+  historyPageSize,
+  setHistoryPage,
 }) {
+  const totalPages = Math.ceil(historyTotalCount / historyPageSize);
   return (
     <>
       <section className='panel panel-form panel-wide'>
@@ -121,6 +126,29 @@ export default function HistorySection({
               <div className='empty-state'>Belum ada data perbandingan</div>
             )}
           </div>
+          {totalPages > 1 && (
+            <div className='pagination-controls' style={{ marginTop: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px' }}>
+              <button 
+                className='secondary-button' 
+                disabled={historyPage <= 1 || isLoadingHistory} 
+                onClick={() => setHistoryPage(p => p - 1)}
+                style={{ borderRadius: '8px', padding: '6px 16px' }}
+              >
+                Sebelumnya
+              </button>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                Halaman <strong>{historyPage}</strong> dari <strong>{totalPages}</strong>
+              </div>
+              <button 
+                className='secondary-button' 
+                disabled={historyPage >= totalPages || isLoadingHistory} 
+                onClick={() => setHistoryPage(p => p + 1)}
+                style={{ borderRadius: '8px', padding: '6px 16px' }}
+              >
+                Selanjutnya
+              </button>
+            </div>
+          )}
         </div>
 
         <div className='history-grid'>

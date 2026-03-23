@@ -16,6 +16,38 @@
   --shadow: 0 24px 60px rgba(64, 34, 7, 0.12);
 }
 
+.tier-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.tier-badge-free {
+  background: rgba(107, 98, 87, 0.12);
+  color: #6b6257;
+  border: 1px solid rgba(107, 98, 87, 0.2);
+}
+
+.tier-badge-pro {
+  background: linear-gradient(135deg, #d65d0e, #af4a0c);
+  color: white;
+  box-shadow: 0 4px 12px rgba(214, 93, 14, 0.25);
+}
+
+.tier-badge-enterprise {
+  background: linear-gradient(135deg, #1c1b1a, #45403d);
+  color: #ffb84d;
+  border: 1px solid #ffb84d;
+  box-shadow: 0 4px 15px rgba(28, 27, 26, 0.35);
+}
+
 .landing-shell {
   --bg: #eff9f1;
   --text: #112a1d;
@@ -3252,4 +3284,132 @@ select:focus {
     gap: 16px !important;
     align-items: flex-start !important;
   }
+}
+
+/* Report Section Styles */
+.report-section {
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+  grid-column: 1 / -1;
+}
+
+.report-controls {
+  padding: 24px;
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+}
+
+.report-filters {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.report-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.report-filters span {
+  font-size: 0.85rem;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.report-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.card-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.card-value span {
+  font-size: 1rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.report-summary-panel {
+  grid-column: 1 / -1;
+  padding: 32px;
+  background: linear-gradient(135deg, #f8fdfa 0%, #eef9f2 100%);
+  border: 1px solid rgba(21, 150, 90, 0.1);
+}
+
+.report-actions {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+/* Lock Screen */
+.lock-screen {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  grid-column: 1 / -1;
+}
+
+.lock-card {
+  max-width: 500px;
+  text-align: center;
+  padding: 48px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.lock-icon {
+  font-size: 3rem;
+  color: var(--accent);
+  margin-bottom: 24px;
+}
+
+.lock-benefits {
+  margin: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.benefit-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.benefit-item svg {
+  color: var(--success);
 }

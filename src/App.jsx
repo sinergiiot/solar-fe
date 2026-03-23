@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FiAlertCircle, FiBarChart2, FiCheckCircle, FiCpu, FiHome, FiLogOut, FiMenu, FiSettings, FiSun, FiUser, FiX } from "react-icons/fi";
+import { FiAlertCircle, FiBarChart2, FiCheckCircle, FiCpu, FiFileText, FiHome, FiLogOut, FiMenu, FiSettings, FiShield, FiSun, FiUser, FiX } from "react-icons/fi";
 
 import {
   createSolarProfile,
@@ -40,8 +40,11 @@ import ForecastSection from "./components/ForecastSection";
 import HistorySection from "./components/HistorySection";
 import IntegrationSection from "./components/IntegrationSection";
 import ProfileSection from "./components/ProfileSection";
+import ReportSection from "./components/ReportSection";
+import AdminSection from "./components/AdminSection";
 import LandingVideo from "./components/LandingVideo";
 import LandingFooter from "./components/LandingFooter";
+import TierBadge from "./components/TierBadge";
 
 const emptyRegisterForm = {
   name: "",
@@ -126,6 +129,9 @@ export default function App() {
   const [heartbeatSummary, setHeartbeatSummary] = useState(null);
   const [deviceForm, setDeviceForm] = useState(emptyDeviceForm);
   const [latestDeviceKey, setLatestDeviceKey] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalCount, setHistoryTotalCount] = useState(0);
+  const [historyPageSize] = useState(10);
 
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginForm, setLoginForm] = useState(emptyLoginForm);
@@ -401,6 +407,8 @@ export default function App() {
     setHistoryProfileID("");
     setHistoryStartDate(getDateDaysAgo(30));
     setHistoryEndDate(getTodayLocalDate());
+    setHistoryPage(1);
+    setHistoryTotalCount(0);
     setHeartbeatSummary(null);
     setDevices([]);
     setDeviceForm(emptyDeviceForm);
@@ -752,6 +760,8 @@ export default function App() {
       profile_id: historyProfileID || undefined,
       start_date: historyStartDate || undefined,
       end_date: historyEndDate || undefined,
+      page: historyPage,
+      page_size: historyPageSize,
     };
 
     try {
@@ -759,13 +769,22 @@ export default function App() {
 
       setForecastHistory(historyData.forecasts || []);
       setActualHistory(actualsData.actuals || []);
+      // We use the count from forecasts as the primary for pagination progress
+      setHistoryTotalCount(historyData.total_count || 0);
     } catch {
       setForecastHistory([]);
       setActualHistory([]);
+      setHistoryTotalCount(0);
     } finally {
       setIsLoadingHistory(false);
     }
   }
+
+  useEffect(() => {
+    if (token && currentUser && currentPage === 'history') {
+      loadHistoryData();
+    }
+  }, [historyPage]);
 
   // handleApplyHistoryFilter refreshes history lists with selected profile/date scope.
   async function handleApplyHistoryFilter(event) {
@@ -778,7 +797,11 @@ export default function App() {
       return;
     }
 
-    await loadHistoryData();
+    if (historyPage === 1) {
+      await loadHistoryData();
+    } else {
+      setHistoryPage(1);
+    }
     setFeedback("Filter history berhasil diterapkan.");
   }
 
@@ -1171,6 +1194,9 @@ export default function App() {
           <h1 className='sidebar-title'>Solar Forecast</h1>
           {/* <p className='sidebar-subtitle'>Forecast</p> */}
           <p className='sidebar-subtitle'>by Sinergi IoT Nusantara</p>
+          <div style={{ marginTop: '8px' }}>
+            <TierBadge tier={notificationPreference?.plan_tier} />
+          </div>
           <button className='sidebar-close-button' type='button' onClick={() => setIsSidebarOpen(false)} aria-label='Tutup menu'>
             <FiX />
           </button>
@@ -1207,12 +1233,27 @@ export default function App() {
             </span>
             <span className='nav-label'>Integrasi Device</span>
           </button>
+          <button className={`nav-item ${currentPage === "report" ? "active" : ""}`} onClick={() => handleNavigate("report")}>
+            <span className='nav-icon'>
+              <FiFileText />
+            </span>
+            <span className='nav-label'>Laporan Hijau</span>
+          </button>
           <button className={`nav-item ${currentPage === "account" ? "active" : ""}`} onClick={() => handleNavigate("account")}>
             <span className='nav-icon'>
               <FiUser />
             </span>
             <span className='nav-label'>Account Info</span>
           </button>
+
+          {currentUser?.role === "admin" && (
+            <button className={`nav-item ${currentPage === "admin" ? "active" : ""}`} onClick={() => handleNavigate("admin")}>
+              <span className='nav-icon'>
+                <FiShield />
+              </span>
+              <span className='nav-label'>Admin Dashboard</span>
+            </button>
+          )}
         </nav>
 
         <div className='sidebar-footer'>
@@ -1231,14 +1272,19 @@ export default function App() {
             <FiMenu />
           </button>
           <div>
-            <p className='page-eyebrow'>{currentUser?.name || "User"}</p>
+            <div className='page-eyebrow' style={{ display: 'flex', alignItems: 'center' }}>
+              {currentUser?.name || "User"}
+              <TierBadge tier={notificationPreference?.plan_tier} />
+            </div>
             <h1 className='page-title'>
               {currentPage === "dashboard" && "Dashboard"}
               {currentPage === "profile" && "Solar Profile"}
               {currentPage === "forecast" && "Forecast Hari Ini"}
               {currentPage === "history" && "Forecast History"}
               {currentPage === "integration" && "Integrasi Device"}
+              {currentPage === "report" && "Laporan Hijau / ESG"}
               {currentPage === "account" && "Account Info"}
+              {currentPage === "admin" && "Admin Dashboard"}
             </h1>
           </div>
         </div>
@@ -1332,6 +1378,10 @@ export default function App() {
               selectedHistoryRisk={selectedHistoryRisk}
               selectedHistoryHourly={selectedHistoryHourly}
               electricityTariff={electricityTariff}
+              historyPage={historyPage}
+              historyTotalCount={historyTotalCount}
+              historyPageSize={historyPageSize}
+              setHistoryPage={setHistoryPage}
             />
           )}
 
@@ -1358,6 +1408,7 @@ export default function App() {
             />
           )}
 
+          {currentPage === "report" && <ReportSection planTier={notificationPreference.plan_tier} profiles={profiles} />}
           {currentPage === "account" && (
             <AccountSection
               currentUser={currentUser}
@@ -1367,6 +1418,10 @@ export default function App() {
               isSavingNotificationPreference={isSavingNotificationPreference}
               isLoadingNotificationPreference={isLoadingNotificationPreference}
             />
+          )}
+
+          {currentPage === "admin" && currentUser?.role === "admin" && (
+            <AdminSection />
           )}
         </div>
 

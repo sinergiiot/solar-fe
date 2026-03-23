@@ -1,3 +1,5 @@
+import TierBadge from "./TierBadge";
+
 // AccountSection renders account info and notification preference form.
 export default function AccountSection({ currentUser, notificationPreference, setNotificationPreference, handleSaveNotificationPreference, isSavingNotificationPreference, isLoadingNotificationPreference }) {
   return (
@@ -36,7 +38,7 @@ export default function AccountSection({ currentUser, notificationPreference, se
             <label>
               <span>Plan tier</span>
               <select
-                value={notificationPreference.plan_tier}
+                value={notificationPreference.plan_tier === "paid" ? "pro" : notificationPreference.plan_tier}
                 onChange={(event) => {
                   const nextPlan = event.target.value;
                   setNotificationPreference((current) => ({
@@ -51,9 +53,13 @@ export default function AccountSection({ currentUser, notificationPreference, se
                       : {}),
                   }));
                 }}>
-                <option value='free'>Free (Email/Telegram)</option>
-                <option value='paid'>Paid (WhatsApp + fallback)</option>
+                <option value='free'>Free (Basic)</option>
+                <option value='pro'>Pro (Personal & Advanced)</option>
+                <option value='enterprise'>Enterprise (Business & API)</option>
               </select>
+              <div style={{ marginTop: '4px' }}>
+                <TierBadge tier={notificationPreference.plan_tier} />
+              </div>
             </label>
 
             <label>
@@ -61,7 +67,7 @@ export default function AccountSection({ currentUser, notificationPreference, se
               <select value={notificationPreference.primary_channel} onChange={(event) => setNotificationPreference((current) => ({ ...current, primary_channel: event.target.value }))}>
                 <option value='email'>Email</option>
                 <option value='telegram'>Telegram</option>
-                {notificationPreference.plan_tier === "paid" && <option value='whatsapp'>WhatsApp</option>}
+                {notificationPreference.plan_tier !== "free" && <option value='whatsapp'>WhatsApp</option>}
               </select>
             </label>
 
@@ -87,13 +93,13 @@ export default function AccountSection({ currentUser, notificationPreference, se
               </label>
 
               <label className='notification-toggle'>
-                <input
+                 <input
                   type='checkbox'
                   checked={notificationPreference.whatsapp_enabled}
-                  disabled={notificationPreference.plan_tier !== "paid"}
+                  disabled={notificationPreference.plan_tier === "free"}
                   onChange={(event) => setNotificationPreference((current) => ({ ...current, whatsapp_enabled: event.target.checked }))}
                 />
-                <span>WhatsApp enabled (paid)</span>
+                <span>WhatsApp enabled (Pro/Enterprise)</span>
               </label>
             </div>
 
@@ -111,10 +117,10 @@ export default function AccountSection({ currentUser, notificationPreference, se
               <input
                 type='checkbox'
                 checked={notificationPreference.whatsapp_opted_in}
-                disabled={notificationPreference.plan_tier !== "paid"}
+                disabled={notificationPreference.plan_tier === "free"}
                 onChange={(event) => setNotificationPreference((current) => ({ ...current, whatsapp_opted_in: event.target.checked }))}
               />
-              <span>WhatsApp opt-in confirmed</span>
+              <span>WhatsApp opt-in confirmed (Pro/Enterprise)</span>
             </label>
 
             <button className='primary-button' type='submit' disabled={isSavingNotificationPreference}>

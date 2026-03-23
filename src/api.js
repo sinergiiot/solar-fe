@@ -282,4 +282,22 @@ export function updateNotificationPreferences(input) {
   });
 }
 
+// getEnergyReport fetches cumulative energy and CO2 savings report for authenticated user.
+export function getEnergyReport(params = {}) {
+  return request(`/report/energy${buildQueryString(params)}`);
+}
+
+// adminGetUsers fetches all users with their current tier (Admin only).
+export function adminGetUsers() {
+  return request("/admin/users");
+}
+
+// adminUpdateUserTier updates one user's subscription tier (Admin only).
+export function adminUpdateUserTier(userID, planTier) {
+  return request(`/admin/users/${userID}/tier`, {
+    method: "PUT",
+    body: JSON.stringify({ plan_tier: planTier }),
+  });
+}
+
 export { API_BASE_URL };
