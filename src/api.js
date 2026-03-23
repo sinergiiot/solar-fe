@@ -300,4 +300,24 @@ export function adminUpdateUserTier(userID, planTier) {
   });
 }
 
+// listAPIKeys fetches all user API keys.
+export function listAPIKeys() {
+  return request("/api-keys");
+}
+
+// createAPIKey creates a new user API key.
+export function createAPIKey(input) {
+  return request("/api-keys", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// deleteAPIKey removes one user API key.
+export function deleteAPIKey(keyID) {
+  return request(`/api-keys/${keyID}`, {
+    method: "DELETE",
+  });
+}
+
 export { API_BASE_URL };

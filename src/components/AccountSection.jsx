@@ -1,7 +1,33 @@
+import { useState } from "react";
+import { FiKey, FiPlus, FiTrash2, FiFileText } from "react-icons/fi";
 import TierBadge from "./TierBadge";
 
 // AccountSection renders account info and notification preference form.
-export default function AccountSection({ currentUser, notificationPreference, setNotificationPreference, handleSaveNotificationPreference, isSavingNotificationPreference, isLoadingNotificationPreference }) {
+export default function AccountSection({ 
+  currentUser, 
+  notificationPreference, 
+  setNotificationPreference, 
+  handleSaveNotificationPreference, 
+  isSavingNotificationPreference, 
+  isLoadingNotificationPreference,
+  apiKeys = [],
+  isLoadingAPIKeys = false,
+  isSavingAPIKey = false,
+  onCreateAPIKey,
+  onDeleteAPIKey
+}) {
+  const [newKeyName, setNewKeyName] = useState("");
+  const [generatedKey, setGeneratedKey] = useState("");
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!newKeyName) return;
+    const key = await onCreateAPIKey(newKeyName);
+    if (key) {
+      setGeneratedKey(key);
+      setNewKeyName("");
+    }
+  };
   return (
     <section className='panel panel-wide summary-panel'>
       <div className='panel-heading'>
@@ -129,6 +155,112 @@ export default function AccountSection({ currentUser, notificationPreference, se
           </form>
         )}
       </div>
+
+      {notificationPreference.plan_tier === "enterprise" && (
+        <div className='account-notification-block' style={{ marginTop: '40px' }}>
+          <div className='panel-heading'>
+            <span className='panel-kicker'>Developer</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+              <h2>API Key Management</h2>
+              <a 
+                href="/docs/api-guide.md" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="docs-link"
+              >
+                <FiFileText /> Dokumentasi API
+              </a>
+            </div>
+          </div>
+
+          <form className='stack' onSubmit={handleCreate} style={{ marginBottom: '24px' }}>
+            <label>
+              <span>Nama Key Baru</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  value={newKeyName} 
+                  onChange={(e) => setNewKeyName(e.target.value)} 
+                  placeholder='e.g. My Production App' 
+                  disabled={isSavingAPIKey}
+                />
+                <button 
+                  className='primary-button' 
+                  type='submit' 
+                  disabled={isSavingAPIKey}
+                  style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px' }}
+                >
+                  <FiPlus /> Buat Key
+                </button>
+              </div>
+            </label>
+          </form>
+
+          {generatedKey && (
+            <div className='banner banner-success' style={{ marginBottom: '24px', position: 'relative' }}>
+              <div style={{ fontWeight: 'bold', marginBottom: '8px' }}>Key Berhasil Dibuat!</div>
+              <p>Simpan key ini sekarang, karena Anda tidak akan bisa melihatnya lagi:</p>
+              <div style={{ 
+                background: 'rgba(255,255,255,0.2)', 
+                padding: '12px', 
+                borderRadius: '8px', 
+                fontFamily: 'monospace', 
+                wordBreak: 'break-all',
+                marginTop: '8px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                {generatedKey}
+                <button 
+                  className='banner-close' 
+                  style={{ position: 'static' }} 
+                  onClick={() => setGeneratedKey("")}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isLoadingAPIKeys ? (
+            <div className='empty-state'>Memuat API Keys...</div>
+          ) : apiKeys.length > 0 ? (
+            <div className='history-table'>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Nama</th>
+                    <th>Preview</th>
+                    <th>Terakhir Digunakan</th>
+                    <th style={{ textAlign: 'right' }}>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {apiKeys.map((k) => (
+                    <tr key={k.id}>
+                      <td>{k.name}</td>
+                      <td><code>{k.api_key_preview}</code></td>
+                      <td>{k.last_used_at ? new Date(k.last_used_at).toLocaleString() : 'Belum pernah'}</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button 
+                          className='banner-close' 
+                          style={{ position: 'static', color: 'var(--error)' }} 
+                          onClick={() => onDeleteAPIKey(k.id)}
+                          title='Hapus Key'
+                        >
+                          <FiTrash2 />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className='empty-state'>Anda belum memiliki API Key.</div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

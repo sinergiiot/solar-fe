@@ -31,6 +31,9 @@ import {
   setStoredToken,
   updateNotificationPreferences,
   verifyEmail,
+  listAPIKeys,
+  createAPIKey,
+  deleteAPIKey,
 } from "./api";
 import { getDateDaysAgo, getHistoryRowKey, getHourlyDistribution, getTodayLocalDate, getWeatherRisk } from "./utils";
 import AccountSection from "./components/AccountSection";
@@ -132,6 +135,9 @@ export default function App() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyTotalCount, setHistoryTotalCount] = useState(0);
   const [historyPageSize] = useState(10);
+  const [apiKeys, setAPIKeys] = useState([]);
+  const [isSavingAPIKey, setIsSavingAPIKey] = useState(false);
+  const [isLoadingAPIKeys, setIsLoadingAPIKeys] = useState(false);
 
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginForm, setLoginForm] = useState(emptyLoginForm);
@@ -204,6 +210,7 @@ export default function App() {
     }
 
     loadNotificationPreference();
+    loadAPIKeys();
   }, [token, currentPage]);
 
   useEffect(() => {
@@ -502,6 +509,45 @@ export default function App() {
       setError(saveError.message);
     } finally {
       setIsSavingNotificationPreference(false);
+    }
+  }
+
+  async function loadAPIKeys() {
+    if (notificationPreference.plan_tier !== "enterprise") return;
+    setIsLoadingAPIKeys(true);
+    try {
+      const result = await listAPIKeys();
+      setAPIKeys(result.api_keys || []);
+    } catch (err) {
+      console.error("Failed to load API keys:", err);
+    } finally {
+      setIsLoadingAPIKeys(false);
+    }
+  }
+
+  async function handleCreateAPIKey(name) {
+    setIsSavingAPIKey(true);
+    setError("");
+    try {
+      const result = await createAPIKey({ name });
+      await loadAPIKeys();
+      return result.api_key; // Return so UI can show it once
+    } catch (err) {
+      setError(err.message);
+      return null;
+    } finally {
+      setIsSavingAPIKey(true); // Keep it true briefly for result show? No, use local state in component
+      setIsSavingAPIKey(false);
+    }
+  }
+
+  async function handleDeleteAPIKey(keyID) {
+    setError("");
+    try {
+      await deleteAPIKey(keyID);
+      await loadAPIKeys();
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -1417,6 +1463,11 @@ export default function App() {
               handleSaveNotificationPreference={handleSaveNotificationPreference}
               isSavingNotificationPreference={isSavingNotificationPreference}
               isLoadingNotificationPreference={isLoadingNotificationPreference}
+              apiKeys={apiKeys}
+              isLoadingAPIKeys={isLoadingAPIKeys}
+              isSavingAPIKey={isSavingAPIKey}
+              onCreateAPIKey={handleCreateAPIKey}
+              onDeleteAPIKey={handleDeleteAPIKey}
             />
           )}
 

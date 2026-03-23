@@ -116,6 +116,26 @@ select {
   cursor: wait;
 }
 
+.docs-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.docs-link:hover {
+  background: var(--accent);
+  color: white;
+  transform: translateY(-1px);
+}
+
 #root {
   min-height: 100vh;
 }
