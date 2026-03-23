@@ -250,8 +250,13 @@ export default function HistorySection({
                 <span className='metric-note'>Referensi: {selectedHistoryRow.actual_kwh !== null ? `actual ${formatDateID(selectedHistoryRow.date)}` : "actual referensi"}</span>
               </div>
               <div>
-                <span className='metric-label'>Status risiko cuaca</span>
-                <strong className={`forecast-risk-badge forecast-risk-${selectedHistoryRisk.tone}`}>{selectedHistoryRisk.label}</strong>
+                <span className='metric-label'>Status Risiko Cuaca</span>
+                <span className='metric-help' title='Indikasi potensi penurunan produksi akibat cuaca (Cloud & ΔWF).'>
+                  ?
+                </span>
+                <strong className={`forecast-risk-badge forecast-risk-${selectedHistoryRow?.weather_risk_status === 'Potensi Drop Drastis' ? 'high' : selectedHistoryRow?.weather_risk_status === 'Potensi Fluktuasi' ? 'medium' : 'low'}`}>
+                  {selectedHistoryRow ? (selectedHistoryRow.weather_risk_status || "Produksi Optimal") : "--"}
+                </strong>
               </div>
             </div>
 

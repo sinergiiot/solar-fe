@@ -1037,6 +1037,7 @@ export default function App() {
       predicted_kwh: Number(item.predicted_kwh),
       weather_factor: Number(item.weather_factor),
       efficiency: Number(item.efficiency),
+      weather_risk_status: item.weather_risk_status,
       actual_kwh: null,
       source: null,
     });
@@ -1055,6 +1056,7 @@ export default function App() {
       predicted_kwh: null,
       weather_factor: null,
       efficiency: null,
+      weather_risk_status: null,
       actual_kwh: Number(item.actual_kwh),
       source: item.source,
     });
@@ -1086,7 +1088,16 @@ export default function App() {
   const defaultHistoryRow = historyComparisonRows.find((row) => row.predicted_kwh !== null) || historyComparisonRows[0] || null;
   const selectedHistoryRow = historyComparisonRows.find((row) => getHistoryRowKey(row) === selectedHistoryRowKey) || defaultHistoryRow;
   const selectedHistoryProfile = selectedHistoryRow ? profiles.find((p) => p.id === selectedHistoryRow.solar_profile_id) || null : null;
-  const selectedHistoryRisk = selectedHistoryRow ? getWeatherRisk(selectedHistoryRow.weather_factor) : { label: "--", tone: "neutral" };
+  const riskMap = {
+    "Potensi Drop Drastis": "high",
+    "Potensi Fluktuasi": "medium",
+    "Produksi Optimal": "low",
+  };
+  const selectedHistoryRisk = selectedHistoryRow
+    ? selectedHistoryRow.weather_risk_status
+      ? { label: selectedHistoryRow.weather_risk_status, tone: riskMap[selectedHistoryRow.weather_risk_status] || "neutral" }
+      : getWeatherRisk(selectedHistoryRow.weather_factor)
+    : { label: "--", tone: "neutral" };
   const selectedHistoryHourly =
     selectedHistoryRow && selectedHistoryRow.predicted_kwh !== null
       ? getHourlyDistribution(selectedHistoryRow.date, selectedHistoryProfile?.lat, Number(selectedHistoryRow.weather_factor || 0)).map((slot) => ({

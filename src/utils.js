@@ -18,9 +18,9 @@ export function getWeatherRisk(weatherFactor) {
     return { label: "--", tone: "neutral" };
   }
   const factor = Number(weatherFactor);
-  if (factor >= 0.9) return { label: "Risiko Cuaca Rendah", tone: "low" };
-  if (factor >= 0.7) return { label: "Risiko Cuaca Sedang", tone: "medium" };
-  return { label: "Risiko Cuaca Tinggi", tone: "high" };
+  if (factor >= 0.8) return { label: "Produksi Optimal", tone: "low" };
+  if (factor >= 0.5) return { label: "Potensi Fluktuasi", tone: "medium" };
+  return { label: "Potensi Drop Drastis", tone: "high" };
 }
 
 // getHistoryRowKey creates a stable key for merged history rows.

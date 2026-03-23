@@ -40,10 +40,10 @@ export default function ForecastSection({
   const deviationVsReference = forecast && comparisonActual && Number(comparisonActual.actual_kwh) > 0 ? ((predictedToday - Number(comparisonActual.actual_kwh)) / Number(comparisonActual.actual_kwh)) * 100 : null;
 
   // Use new API fields: cloud_cover_mean (percent), transmittance (0-1), baseline_type
-  const weatherRisk = !forecast ? { label: "--", tone: "neutral" } : getWeatherRisk(Number(forecast.cloud_cover_mean));
+  const weatherRisk = !forecast ? { label: "--", tone: "neutral" } : getWeatherRisk(Number(forecast.transmittance || forecast.weather_factor));
   const activeProfile = profiles.find((p) => p.id === activeForecastProfileID) || profile || null;
   const hourlyEstimate = forecast
-    ? getHourlyDistribution(forecast.date, activeProfile?.lat, Number(forecast.cloud_cover_mean)).map((slot) => ({
+    ? getHourlyDistribution(forecast.date, activeProfile?.lat, Number(forecast.transmittance || forecast.weather_factor)).map((slot) => ({
         label: slot.label,
         share: slot.share,
         value: predictedToday * slot.share,
@@ -138,6 +138,15 @@ export default function ForecastSection({
             <strong>{forecast ? `${(Number(forecast.predicted_kwh) * 0.85).toFixed(2)} kgCO2` : "--"}</strong>
           </div>
           <div>
+            <span className='metric-label'>Status Risiko Cuaca</span>
+            <span className='metric-help' title='Indikasi potensi penurunan produksi akibat cuaca (Cloud & ΔWF).'>
+              ?
+            </span>
+            <strong className={`forecast-risk-badge forecast-risk-${forecast?.weather_risk_status === 'Potensi Drop Drastis' ? 'high' : forecast?.weather_risk_status === 'Potensi Fluktuasi' ? 'medium' : 'low'}`}>
+              {forecast ? (forecast.weather_risk_status || "Produksi Optimal") : "--"}
+            </strong>
+          </div>
+          <div>
             <span className='metric-label'>
               Deviasi vs actual referensi
               <span className='metric-help' title='Diprioritaskan actual pada tanggal yang sama; jika belum ada, pakai actual terbaru sebelum tanggal forecast.'>
@@ -146,10 +155,6 @@ export default function ForecastSection({
             </span>
             <strong>{deviationVsReference !== null ? `${deviationVsReference >= 0 ? "+" : ""}${deviationVsReference.toFixed(1)}%` : "--"}</strong>
             <span className='metric-note'>Referensi: {comparisonLabel}</span>
-          </div>
-          <div>
-            <span className='metric-label'>Status risiko cuaca</span>
-            <strong className={`forecast-risk-badge forecast-risk-${weatherRisk.tone}`}>{weatherRisk.label}</strong>
           </div>
         </div>
         <div className='forecast-hourly-card'>

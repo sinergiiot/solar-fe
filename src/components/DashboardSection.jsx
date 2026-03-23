@@ -1,9 +1,58 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiCloud, FiCloudRain, FiCpu, FiEdit3, FiSun, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
-import { formatDateID, formatIDR } from "../utils";
+import { FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
+import { formatDateID, formatIDR, getHourlyDistribution } from "../utils";
 
 // DashboardSection renders heartbeat, summary, and latest 7-day snapshot tables.
-export default function DashboardSection({ heartbeatSummary, summary, dashboardForecastHistory, dashboardActualHistory, todayForecast, activeProfile }) {
+export default function DashboardSection({ 
+  heartbeatSummary, 
+  summary, 
+  dashboardForecastHistory, 
+  dashboardActualHistory, 
+  todayForecast, 
+  activeProfile,
+  profiles = [],
+  actualHistory = [],
+  notificationPreference,
+  onNavigate
+}) {
+  const [isOnboardingCollapsed, setIsOnboardingCollapsed] = useState(false);
+
+  // Onboarding logic
+  const onboardingSteps = [
+    {
+      id: "profile",
+      label: "Lengkapi Solar Profile",
+      desc: "Isi kapasitas panel (kWp) dan lokasi koordinat agar sistem bisa menghitung radiasi matahari.",
+      isDone: profiles.length > 0,
+      link: "profile"
+    },
+    {
+      id: "forecast",
+      label: "Generate Forecast Pertama",
+      desc: "Klik ambil forecast untuk pertama kalinya agar model mulai memproses data cuaca hari ini.",
+      isDone: dashboardForecastHistory.length > 0,
+      link: "forecast"
+    },
+    {
+      id: "actual",
+      label: "Input Data Actual",
+      desc: "Masukkan angka kWh yang dihasilkan panel Anda (bisa manual atau via IoT) untuk melatih akurasi AI.",
+      isDone: actualHistory.length > 0,
+      link: "forecast" // Actual input is also in forecast section
+    },
+    {
+      id: "notification",
+      label: "Aktifkan Notifikasi",
+      desc: "Terima laporan forecast harian setiap pagi melalui Email atau Telegram.",
+      isDone: notificationPreference && (notificationPreference.email_enabled || notificationPreference.telegram_enabled),
+      link: "account"
+    }
+  ];
+
+  const doneCount = onboardingSteps.filter(s => s.isDone).length;
+  const isAllDone = doneCount === onboardingSteps.length;
+  const progressPercent = (doneCount / onboardingSteps.length) * 100;
+
   const forecastByDate = new Map();
   dashboardForecastHistory.slice(0, 7).forEach((item) => {
     forecastByDate.set(item.date, Number(item.predicted_kwh || 0));
@@ -44,110 +93,43 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
   const latestGapPct = latestTrend && latestTrend.actual && latestGapKwh !== null ? (latestGapKwh / latestTrend.actual) * 100 : null;
   const latestGapTone = latestGapPct === null ? "neutral" : Math.abs(latestGapPct) <= 10 ? "good" : Math.abs(latestGapPct) <= 20 ? "warn" : "bad";
 
-  const [todayHourlyWeather, setTodayHourlyWeather] = useState([]);
-  const [isLoadingHourlyWeather, setIsLoadingHourlyWeather] = useState(false);
-
   const latitude = Number(activeProfile?.lat);
   const longitude = Number(activeProfile?.lng);
   const hasLocation = Number.isFinite(latitude) && Number.isFinite(longitude);
 
   const energyEstimate = Number(todayForecast?.predicted_kwh || 0);
-  const weatherFactor = Number(todayForecast?.weather_factor || 0);
+  const weatherFactor = Number(todayForecast?.transmittance || todayForecast?.weather_factor || 0);
   const costEstimate = energyEstimate * 1444;
 
   const conditionLabel = useMemo(() => {
-    if (weatherFactor >= 0.9) return "cerah";
-    if (weatherFactor >= 0.75) return "berawan";
-    if (weatherFactor >= 0.6) return "mendung";
-    return "mendung tebal";
+    if (weatherFactor >= 0.85) return "Cerah";
+    if (weatherFactor >= 0.70) return "Cerah Berawan";
+    if (weatherFactor >= 0.45) return "Berawan";
+    if (weatherFactor >= 0.25) return "Mendung";
+    return "Mendung Tebal";
   }, [weatherFactor]);
 
   const conditionImpact = useMemo(() => {
-    if (weatherFactor >= 0.9) return "dampak ke produksi rendah, panel berpotensi menghasilkan energi optimal";
-    if (weatherFactor >= 0.75) return "dampak ke produksi ringan, output masih cukup baik";
-    if (weatherFactor >= 0.6) return "dampak ke produksi sedang, output cenderung turun dibanding hari cerah";
-    return "dampak ke produksi tinggi, output berpotensi turun signifikan";
+    if (weatherFactor >= 0.85) return "produksi sangat optimal";
+    if (weatherFactor >= 0.70) return "produksi masih stabil & baik";
+    if (weatherFactor >= 0.45) return "produksi sedikit terhambat awan";
+    if (weatherFactor >= 0.25) return "produksi menurun akibat cuaca";
+    return "produksi berpotensi turun drastis";
   }, [weatherFactor]);
 
-  useEffect(() => {
-    if (!hasLocation || !todayForecast?.date) {
-      setTodayHourlyWeather([]);
-      return;
-    }
+  const todayHourlyDistribution = useMemo(() => {
+    if (!todayForecast) return [];
+    return getHourlyDistribution(todayForecast.date, latitude, weatherFactor).map((slot) => ({
+      ...slot,
+      value: energyEstimate * slot.share
+    }));
+  }, [todayForecast, latitude, weatherFactor, energyEstimate]);
 
-    let ignore = false;
-
-    async function loadHourlyWeather() {
-      setIsLoadingHourlyWeather(true);
-      try {
-        const query = new URLSearchParams({
-          latitude: String(latitude),
-          longitude: String(longitude),
-          hourly: "weather_code,cloud_cover,temperature_2m,shortwave_radiation",
-          start_date: todayForecast.date,
-          end_date: todayForecast.date,
-          timezone: "auto",
-        });
-
-        const response = await fetch(`https://api.open-meteo.com/v1/forecast?${query.toString()}`);
-        if (!response.ok) {
-          throw new Error("failed fetch hourly weather");
-        }
-
-        const payload = await response.json();
-        const times = payload?.hourly?.time || [];
-        const weatherCodes = payload?.hourly?.weather_code || [];
-        const clouds = payload?.hourly?.cloud_cover || [];
-        const temperatures = payload?.hourly?.temperature_2m || [];
-        const radiation = payload?.hourly?.shortwave_radiation || [];
-
-        const rows = times
-          .map((timestamp, index) => {
-            const hour = new Date(timestamp).getHours();
-            return {
-              hour,
-              label: `${String(hour).padStart(2, "0")}:00`,
-              weatherCode: Number(weatherCodes[index] ?? 0),
-              cloudCover: Number(clouds[index] ?? 0),
-              temperature: Number(temperatures[index] ?? 0),
-              radiation: Number(radiation[index] ?? 0),
-            };
-          })
-          .filter((row) => row.hour >= 6 && row.hour <= 15)
-          .sort((a, b) => a.hour - b.hour);
-
-        if (!ignore) {
-          setTodayHourlyWeather(rows);
-        }
-      } catch {
-        if (!ignore) {
-          setTodayHourlyWeather([]);
-        }
-      } finally {
-        if (!ignore) {
-          setIsLoadingHourlyWeather(false);
-        }
-      }
-    }
-
-    loadHourlyWeather();
-    return () => {
-      ignore = true;
-    };
-  }, [hasLocation, latitude, longitude, todayForecast?.date]);
-
-  const renderWeatherCode = (weatherCode) => {
-    if ([0].includes(weatherCode)) return { label: "Cerah", icon: <FiSun /> };
-    if ([1, 2, 3].includes(weatherCode)) return { label: "Berawan", icon: <FiCloud /> };
-    if ([45, 48].includes(weatherCode)) return { label: "Berkabut", icon: <FiCloud /> };
-    if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(weatherCode)) return { label: "Hujan", icon: <FiCloudRain /> };
-    return { label: "Variatif", icon: <FiCloud /> };
-  };
 
   const renderMetricHelp = (id, text) => (
     <span className='metric-help-wrap'>
       <button type='button' className='metric-help-button' aria-label={text} aria-describedby={id}>
-        i
+        <FiInfo />
       </button>
       <span id={id} role='tooltip' className='metric-help-tooltip'>
         {text}
@@ -157,41 +139,60 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
 
   return (
     <>
-      <section className='panel panel-wide device-status-panel'>
-        <div className='panel-heading'>
-          <span className='panel-kicker'>Heartbeat</span>
-          <h2>Status Device Lapangan</h2>
-        </div>
-        <div className='device-status-grid'>
-          <div className='summary-card'>
-            <span className='metric-label'>Field Device</span>
-            <strong className='metric-value'>{heartbeatSummary?.has_devices ? "Ada" : "Belum Ada"}</strong>
-            <span className='metric-sublabel'>{heartbeatSummary?.total_devices || 0} device terdaftar</span>
+      {!isAllDone && (
+        <section className={`panel panel-wide onboarding-panel ${isOnboardingCollapsed ? 'collapsed' : ''}`}>
+          <div className='panel-heading onboarding-header' onClick={() => setIsOnboardingCollapsed(!isOnboardingCollapsed)}>
+            <div>
+              <span className='panel-kicker'>Mulai dari Sini</span>
+              <h2>Onboarding Guide ({doneCount}/{onboardingSteps.length})</h2>
+            </div>
+            <div className='onboarding-toggle'>
+              <div className='onboarding-progress-bar'>
+                <div className='onboarding-progress-fill' style={{ width: `${progressPercent}%` }} />
+              </div>
+              <button className='icon-button'>{isOnboardingCollapsed ? "+" : "−"}</button>
+            </div>
           </div>
-          <div className='summary-card'>
-            <span className='metric-label'>Connected</span>
-            <strong className='metric-value'>
-              {heartbeatSummary?.connected_devices || 0}/{heartbeatSummary?.active_devices || 0}
-            </strong>
-            <span className='metric-sublabel'>aktif dalam 24 jam</span>
-          </div>
-          <div className='summary-card'>
-            <span className='metric-label'>Last Heartbeat</span>
-            <strong className='metric-value device-heartbeat'>{heartbeatSummary?.latest_seen_at ? new Date(heartbeatSummary.latest_seen_at).toLocaleString() : "Belum ada data"}</strong>
-            <span className='metric-sublabel'>update terakhir dari device</span>
-          </div>
-          <div className='summary-card'>
-            <span className='metric-label'>Mode Ingest</span>
-            <strong className='metric-value'>12 Jam / Bucket</strong>
-            <span className='metric-sublabel'>hemat storage dan ringan agregasi</span>
-          </div>
-        </div>
-      </section>
+          
+          {!isOnboardingCollapsed && (
+            <div className='onboarding-content'>
+              <p className='dashboard-explainer'>Gunakan panduan ini untuk memaksimalkan fitur AI Solar Forecast. Semakin lengkap data Anda, semakin akurat prediksinya.</p>
+              <div className='onboarding-steps-grid'>
+                {onboardingSteps.map((step) => (
+                  <div key={step.id} className={`onboarding-step-card ${step.isDone ? 'step-done' : ''}`} onClick={() => onNavigate(step.link)}>
+                    <div className='step-status'>
+                      {step.isDone ? <FiCheckCircle style={{ color: '#176f46' }} /> : <div className='step-circle' />}
+                    </div>
+                    <div className='step-body'>
+                      <strong>{step.label}</strong>
+                      <p>{step.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
 
       <section className='panel panel-wide summary-panel today-condition-panel'>
-        <div className='panel-heading'>
-          <span className='panel-kicker'>Today's Condition</span>
-          <h2>Kondisi Hari Ini (update setelah forecast 06:00)</h2>
+        <div className='panel-heading panel-heading-with-status'>
+          <div>
+            <span className='panel-kicker'>Today's Condition</span>
+            <h2>Kondisi Hari Ini</h2>
+          </div>
+          {heartbeatSummary && (
+            <div className={`system-status-pill status-${heartbeatSummary.connected_devices > 0 ? 'online' : 'offline'}`} title={`Last seen: ${heartbeatSummary.latest_seen_at ? new Date(heartbeatSummary.latest_seen_at).toLocaleString() : 'Never'}`}>
+               <span className='status-dot'></span>
+               <span className='status-text'>
+                 {heartbeatSummary.total_devices > 1 
+                   ? `${heartbeatSummary.connected_devices}/${heartbeatSummary.total_devices} IoT Online`
+                   : (heartbeatSummary.connected_devices > 0 ? 'IoT Online' : 'IoT Offline')
+                 }
+               </span>
+            </div>
+          )}
         </div>
         {todayForecast && hasLocation ? (
           <>
@@ -229,36 +230,39 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
                   <strong className='metric-value'>{formatIDR(costEstimate)}</strong>
                   <span className='metric-sublabel'>asumsi tarif Rp 1.444 / kWh</span>
                 </div>
+                <div className='summary-card'>
+                  <span className='metric-label'>Status Risiko Cuaca</span>
+                  <strong className='metric-value'>{todayForecast.weather_risk_status || "Stabil"}</strong>
+                  <span className='metric-sublabel'>berdasarkan cloud & ΔWF</span>
+                </div>
               </div>
             </div>
 
-            <h3 className='today-hourly-title'>Ramalan Cuaca Per Jam (06:00-15:00)</h3>
-            {isLoadingHourlyWeather ? (
-              <div className='empty-state'>Memuat ramalan cuaca per jam...</div>
-            ) : todayHourlyWeather.length > 0 ? (
-              <div className='today-hourly-grid'>
-                {todayHourlyWeather.map((item) => {
-                  const weatherVisual = renderWeatherCode(item.weatherCode);
-                  return (
-                    <article key={item.label} className='today-hourly-card'>
-                      <div className='today-hourly-head'>
-                        <span>{item.label}</span>
-                        <span className='today-hourly-icon'>{weatherVisual.icon}</span>
-                      </div>
-                      <strong>{weatherVisual.label}</strong>
-                      <p>Awan: {item.cloudCover.toFixed(0)}%</p>
-                      <p>Suhu: {item.temperature.toFixed(1)}°C</p>
-                      <p>Radiasi: {item.radiation.toFixed(0)} W/m²</p>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className='empty-state'>Data hourly cuaca belum tersedia untuk hari ini.</div>
-            )}
+            <h3 className='today-hourly-title'>Estimasi Produksi per Periode Waktu (Dinamis)</h3>
+            <div className='forecast-hourly-grid'>
+              {todayHourlyDistribution.map((slot) => (
+                <div key={slot.label} className='forecast-hourly-item'>
+                  <span>{slot.label}</span>
+                  <strong>{slot.value.toFixed(2)} kWh</strong>
+                  <small>{(slot.share * 100).toFixed(0)}% porsi</small>
+                  <div className='forecast-hourly-bar-track'>
+                    <div className='forecast-hourly-bar-fill' style={{ width: `${slot.share * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className='dashboard-explainer' style={{ marginTop: '1rem', fontSize: '0.85rem', opacity: 0.8 }}>
+              Model membagi energi berdasarkan musim, lintang profile, dan weather factor.
+            </p>
           </>
         ) : (
-          <div className='empty-state'>Tambahkan solar profile dengan koordinat valid lalu muat forecast hari ini untuk melihat Today's Condition.</div>
+          <div className='empty-state-card'>
+            <FiCloud className='empty-icon' />
+            <p>Belum ada data forecast untuk hari ini.</p>
+            <button className='primary-button' onClick={() => onNavigate("forecast")}>
+              Klik untuk Ambil Forecast Baru
+            </button>
+          </div>
         )}
       </section>
 
@@ -272,7 +276,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
           <div className='summary-card'>
             <span className='metric-label metric-label-row'>
               Total Forecast
-              {renderMetricHelp("help-total-forecast", "Akumulasi total energi yang diprediksi sistem dalam 90 hari terakhir.")}
+              {/* {renderMetricHelp("help-total-forecast", "Akumulasi total energi yang diprediksi sistem dalam 90 hari terakhir.")} */}
             </span>
             <strong className='metric-value'>{summary ? summary.total_forecasted_kwh.toFixed(1) : "--"} kWh</strong>
             <span className='metric-sublabel'>{summary ? summary.forecast_count : 0} hari</span>
@@ -280,7 +284,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
           <div className='summary-card'>
             <span className='metric-label metric-label-row'>
               Total Actual
-              {renderMetricHelp("help-total-actual", "Akumulasi total energi actual yang tercatat (manual/IoT) dalam 90 hari terakhir.")}
+              {/* {renderMetricHelp("help-total-actual", "Akumulasi total energi actual yang tercatat (manual/IoT) dalam 90 hari terakhir.")} */}
             </span>
             <strong className='metric-value'>{summary ? summary.total_actual_kwh.toFixed(1) : "--"} kWh</strong>
             <span className='metric-sublabel'>{summary ? summary.actual_count : 0} hari</span>
@@ -288,7 +292,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
           <div className='summary-card'>
             <span className='metric-label metric-label-row'>
               Avg Forecast
-              {renderMetricHelp("help-avg-forecast", "Rata-rata energi forecast per hari. Dipakai untuk melihat baseline prediksi harian.")}
+              {/* {renderMetricHelp("help-avg-forecast", "Rata-rata energi forecast per hari. Dipakai untuk melihat baseline prediksi harian.")} */}
             </span>
             <strong className='metric-value'>{summary ? summary.average_forecast_kwh.toFixed(2) : "--"} kWh</strong>
             <span className='metric-sublabel'>per hari</span>
@@ -296,7 +300,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
           <div className='summary-card'>
             <span className='metric-label metric-label-row'>
               Avg Actual
-              {renderMetricHelp("help-avg-actual", "Rata-rata energi actual per hari dari data lapangan.")}
+              {/* {renderMetricHelp("help-avg-actual", "Rata-rata energi actual per hari dari data lapangan.")} */}
             </span>
             <strong className='metric-value'>{summary ? summary.average_actual_kwh.toFixed(2) : "--"} kWh</strong>
             <span className='metric-sublabel'>per hari</span>
@@ -304,7 +308,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
           <div className='summary-card'>
             <span className='metric-label metric-label-row'>
               Efficiency
-              {renderMetricHelp("help-efficiency", "Faktor performa model/sistem saat menghitung forecast. Semakin stabil, prediksi biasanya makin konsisten.")}
+              {/* {renderMetricHelp("help-efficiency", "Faktor performa model/sistem saat menghitung forecast. Semakin stabil, prediksi biasanya makin konsisten.")} */}
             </span>
             <strong className='metric-value'>{summary ? (summary.current_efficiency * 100).toFixed(1) : "--"}%</strong>
             <span className='metric-sublabel'>adaptif</span>
@@ -312,7 +316,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
           <div className='summary-card'>
             <span className='metric-label metric-label-row'>
               Akurasi
-              {renderMetricHelp("help-accuracy", "Persentase kedekatan forecast terhadap actual. Semakin mendekati 100%, semakin baik kualitas prediksi.")}
+              {/* {renderMetricHelp("help-accuracy", "Persentase kedekatan forecast terhadap actual. Semakin mendekati 100%, semakin baik kualitas prediksi.")} */}
             </span>
             <strong className={`metric-value ${accuracyClass}`}>{summary ? summary.accuracy_percent.toFixed(1) : "--"}%</strong>
             <span className='metric-sublabel'>prediksi vs real</span>
@@ -431,6 +435,7 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
                       <th>Tanggal</th>
                       <th>Prediksi (kWh)</th>
                       <th>Weather</th>
+                      <th>Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -438,7 +443,8 @@ export default function DashboardSection({ heartbeatSummary, summary, dashboardF
                       <tr key={idx}>
                         <td>{f.date}</td>
                         <td>{Number(f.predicted_kwh).toFixed(2)}</td>
-                        <td>{Number(f.weather_factor).toFixed(2)}</td>
+                        <td>{Number(f.transmittance || f.weather_factor || 0).toFixed(2)}</td>
+                        <td>{f.weather_risk_status || "Stabil"}</td>
                       </tr>
                     ))}
                   </tbody>
