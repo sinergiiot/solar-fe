@@ -28,7 +28,6 @@ function getCloudLabel(cloudCover) {
   return "Sangat Mendung / Hujan 🌧️";
 }
 
-// AuthFlow renders landing page, register, and login screens for unauthenticated users.
 export default function AuthFlow({
   authPage,
   setAuthPage,
@@ -50,6 +49,12 @@ export default function AuthFlow({
   setSimCloudCover,
   simTimePreset,
   setSimTimePreset,
+  forgotPasswordForm,
+  setForgotPasswordForm,
+  handleForgotPassword,
+  resetPasswordForm,
+  setResetPasswordForm,
+  handleResetPassword,
 }) {
   // ── Register page ──────────────────────────────────────────────────────
   if (authPage === "register") {
@@ -166,7 +171,20 @@ export default function AuthFlow({
                 {isAuthLoading ? "Memproses login..." : "Masuk Sekarang"}
               </button>
             </form>
-            <p className='auth-subpage-switch'>
+            <div className='auth-subpage-switch'>
+              <button
+                type='button'
+                className='link-btn'
+                style={{ fontSize: "0.85rem", opacity: 0.8 }}
+                onClick={() => {
+                  setError("");
+                  setFeedback("");
+                  setAuthPage("forgot-password");
+                }}>
+                Lupa Password?
+              </button>
+            </div>
+            <p className='auth-subpage-switch' style={{ marginTop: 12 }}>
               Belum punya akun?{" "}
               <button
                 type='button'
@@ -179,6 +197,110 @@ export default function AuthFlow({
                 Daftar gratis
               </button>
             </p>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Forgot Password page ────────────────────────────────────────────────
+  if (authPage === "forgot-password") {
+    return (
+      <div className='shell landing-shell auth-subpage'>
+        <div className='backdrop backdrop-left' />
+        <div className='backdrop backdrop-right' />
+        <div className='auth-subpage-wrap'>
+          <button
+            className='auth-back-btn'
+            type='button'
+            onClick={() => {
+              setError("");
+              setFeedback("");
+              setAuthPage("login");
+            }}>
+            <FiArrowLeft /> Kembali ke Login
+          </button>
+          {(error || feedback) && (
+            <div className={`banner ${error ? "banner-error" : "banner-success"}${feedbackFading && !error ? " banner-fading" : ""}`}>
+              <span>{error || feedback}</span>
+              <button className='banner-close' type='button' onClick={() => (error ? setError("") : setFeedback(""))} aria-label='Tutup'>
+                ×
+              </button>
+            </div>
+          )}
+          <section className='panel auth-subpage-card'>
+            <div className='panel-heading'>
+              <p className='eyebrow'>Reset Access</p>
+              <h2>Lupa Password?</h2>
+              <p className='hero-copy' style={{ marginTop: 6 }}>
+                Masukkan email Anda untuk menerima kode OTP reset password.
+              </p>
+            </div>
+            <form className='stack' onSubmit={handleForgotPassword}>
+              <label>
+                <span>Email Terdaftar</span>
+                <input type='email' value={forgotPasswordForm.email} onChange={(e) => setForgotPasswordForm({ ...forgotPasswordForm, email: e.target.value })} placeholder='tim-energy@company.com' required />
+              </label>
+              <button className='primary-button' disabled={isAuthLoading} type='submit'>
+                {isAuthLoading ? "Mengirim kode..." : "Kirim Kode Reset"}
+              </button>
+            </form>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Reset Password page ─────────────────────────────────────────────────
+  if (authPage === "reset-password") {
+    return (
+      <div className='shell landing-shell auth-subpage'>
+        <div className='backdrop backdrop-left' />
+        <div className='backdrop backdrop-right' />
+        <div className='auth-subpage-wrap'>
+          <button
+            className='auth-back-btn'
+            type='button'
+            onClick={() => {
+              setError("");
+              setFeedback("");
+              setAuthPage("forgot-password");
+            }}>
+            <FiArrowLeft /> Ganti Email
+          </button>
+          {(error || feedback) && (
+            <div className={`banner ${error ? "banner-error" : "banner-success"}${feedbackFading && !error ? " banner-fading" : ""}`}>
+              <span>{error || feedback}</span>
+              <button className='banner-close' type='button' onClick={() => (error ? setError("") : setFeedback(""))} aria-label='Tutup'>
+                ×
+              </button>
+            </div>
+          )}
+          <section className='panel auth-subpage-card'>
+            <div className='panel-heading'>
+              <p className='eyebrow'>Secure Update</p>
+              <h2>Setel Password Baru</h2>
+              <p className='hero-copy' style={{ marginTop: 6 }}>
+                Masukkan kode OTP dari email dan tentukan password baru Anda.
+              </p>
+            </div>
+            <form className='stack' onSubmit={handleResetPassword}>
+              <label>
+                <span>Email</span>
+                <input type='email' value={resetPasswordForm.email} disabled />
+              </label>
+              <label>
+                <span>Kode OTP (6 Digit)</span>
+                <input type='text' value={resetPasswordForm.code} onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, code: e.target.value })} placeholder='000000' maxLength={6} required />
+              </label>
+              <label>
+                <span>Password Baru</span>
+                <input type='password' value={resetPasswordForm.new_password} onChange={(e) => setResetPasswordForm({ ...resetPasswordForm, new_password: e.target.value })} placeholder='Minimal 8 karakter' minLength={8} required />
+              </label>
+              <button className='primary-button' disabled={isAuthLoading} type='submit'>
+                {isAuthLoading ? "Memperbarui password..." : "Simpan Password Baru"}
+              </button>
+            </form>
           </section>
         </div>
       </div>

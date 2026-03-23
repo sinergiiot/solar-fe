@@ -139,6 +139,22 @@ export function getMe() {
   return request("/auth/me");
 }
 
+// forgotPassword triggers OTP delivery for password reset.
+export function forgotPassword(input) {
+  return request("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// resetPassword validates OTP and updates password.
+export function resetPassword(input) {
+  return request("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 // createSolarProfile upserts the authenticated user's solar profile.
 export function createSolarProfile(input) {
   return request("/solar-profiles", {

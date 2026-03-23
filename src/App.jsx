@@ -23,6 +23,8 @@ import {
   login,
   logout,
   resendVerification,
+  forgotPassword,
+  resetPassword,
   recordActualDaily,
   register,
   setStoredRefreshToken,
@@ -55,6 +57,16 @@ const emptyLoginForm = {
 const emptyVerifyForm = {
   email: "",
   code: "",
+};
+
+const emptyForgotPasswordForm = {
+  email: "",
+};
+
+const emptyResetPasswordForm = {
+  email: "",
+  code: "",
+  new_password: "",
 };
 
 const emptyProfileForm = {
@@ -118,6 +130,8 @@ export default function App() {
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginForm, setLoginForm] = useState(emptyLoginForm);
   const [verifyForm, setVerifyForm] = useState(emptyVerifyForm);
+  const [forgotPasswordForm, setForgotPasswordForm] = useState(emptyForgotPasswordForm);
+  const [resetPasswordForm, setResetPasswordForm] = useState(emptyResetPasswordForm);
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [profileForm, setProfileForm] = useState(emptyProfileForm);
   const [actualForm, setActualForm] = useState(emptyActualForm);
@@ -563,6 +577,43 @@ export default function App() {
     }
   }
 
+  async function handleForgotPassword(event) {
+    event.preventDefault();
+    setIsAuthLoading(true);
+    setError("");
+    setFeedback("");
+
+    try {
+      const response = await forgotPassword({ email: forgotPasswordForm.email });
+      setResetPasswordForm({ ...emptyResetPasswordForm, email: forgotPasswordForm.email });
+      setAuthPage("reset-password");
+      setFeedback(response.message || "Kode reset password telah dikirim ke email Anda.");
+    } catch (authError) {
+      setError(authError.message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
+
+  async function handleResetPassword(event) {
+    event.preventDefault();
+    setIsAuthLoading(true);
+    setError("");
+    setFeedback("");
+
+    try {
+      const response = await resetPassword(resetPasswordForm);
+      setAuthPage("login");
+      setResetPasswordForm(emptyResetPasswordForm);
+      setForgotPasswordForm(emptyForgotPasswordForm);
+      setFeedback(response.message || "Password berhasil diperbarui. Silakan login kembali.");
+    } catch (authError) {
+      setError(authError.message);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  }
+
   async function handleCreateProfile(event) {
     event.preventDefault();
     setIsSavingProfile(true);
@@ -998,6 +1049,12 @@ export default function App() {
           pendingVerificationEmail={pendingVerificationEmail}
           handleVerifyEmail={handleVerifyEmail}
           handleResendVerification={handleResendVerification}
+          forgotPasswordForm={forgotPasswordForm}
+          setForgotPasswordForm={setForgotPasswordForm}
+          handleForgotPassword={handleForgotPassword}
+          resetPasswordForm={resetPasswordForm}
+          setResetPasswordForm={setResetPasswordForm}
+          handleResetPassword={handleResetPassword}
           simCapacity={simCapacity}
           setSimCapacity={setSimCapacity}
           simCloudCover={simCloudCover}
