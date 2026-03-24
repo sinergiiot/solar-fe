@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FiAlertCircle, FiBarChart2, FiCheckCircle, FiCpu, FiFileText, FiHome, FiLogOut, FiMenu, FiSettings, FiShield, FiSun, FiUser, FiX } from "react-icons/fi";
+import { FiAlertCircle, FiBarChart2, FiCheckCircle, FiCode, FiCpu, FiFileText, FiHome, FiLogOut, FiMenu, FiSettings, FiShield, FiSun, FiUser, FiX } from "react-icons/fi";
 
 import {
   createSolarProfile,
@@ -45,6 +45,7 @@ import IntegrationSection from "./components/IntegrationSection";
 import ProfileSection from "./components/ProfileSection";
 import ReportSection from "./components/ReportSection";
 import AdminSection from "./components/AdminSection";
+import DocsSection from "./components/DocsSection";
 import LandingVideo from "./components/LandingVideo";
 import LandingFooter from "./components/LandingFooter";
 import TierBadge from "./components/TierBadge";
@@ -1291,6 +1292,12 @@ export default function App() {
             </span>
             <span className='nav-label'>Account Info</span>
           </button>
+          <button className={`nav-item ${currentPage === "docs" ? "active" : ""}`} onClick={() => handleNavigate("docs")}>
+            <span className='nav-icon'>
+              <FiCode />
+            </span>
+            <span className='nav-label'>API Docs</span>
+          </button>
 
           {currentUser?.role === "admin" && (
             <button className={`nav-item ${currentPage === "admin" ? "active" : ""}`} onClick={() => handleNavigate("admin")}>
@@ -1330,6 +1337,7 @@ export default function App() {
               {currentPage === "integration" && "Integrasi Device"}
               {currentPage === "report" && "Laporan Hijau / ESG"}
               {currentPage === "account" && "Account Info"}
+              {currentPage === "docs" && "API Integration Guide"}
               {currentPage === "admin" && "Admin Dashboard"}
             </h1>
           </div>
@@ -1468,12 +1476,15 @@ export default function App() {
               isSavingAPIKey={isSavingAPIKey}
               onCreateAPIKey={handleCreateAPIKey}
               onDeleteAPIKey={handleDeleteAPIKey}
+              onNavigate={handleNavigate}
             />
           )}
 
           {currentPage === "admin" && currentUser?.role === "admin" && (
             <AdminSection />
           )}
+
+          {currentPage === "docs" && <DocsSection />}
         </div>
 
         {showOnboardingModal && (

@@ -140,6 +140,237 @@ select {
   min-height: 100vh;
 }
 
+/* ── API Documentation (DocsSection) ──────────────────────────────────── */
+.docs-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 32px;
+  align-items: start;
+}
+
+.docs-nav-sticky {
+  position: sticky;
+  top: 24px;
+}
+
+.docs-sidebar-inner {
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.docs-nav-title {
+  margin: 0 0 16px;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.docs-nav-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.docs-nav-link {
+  display: block;
+  padding: 8px 12px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.94rem;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.docs-nav-link:hover {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  transform: translateX(4px);
+}
+
+.docs-content {
+  display: grid;
+  gap: 24px;
+}
+
+.docs-card {
+  padding: 32px;
+  border-radius: 24px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.docs-header-hero {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.docs-hero-icon {
+  font-size: 3.5rem;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 16px;
+  border-radius: 20px;
+}
+
+.docs-title {
+  font-size: 2.2rem;
+  margin: 4px 0 8px;
+}
+
+.docs-subtitle {
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.6;
+}
+
+.docs-section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.docs-section-icon {
+  font-size: 1.5rem;
+  color: var(--accent-deep);
+}
+
+.docs-section-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.docs-alert-info {
+  margin: 20px 0;
+  padding: 16px 20px;
+  background: rgba(30, 171, 104, 0.08);
+  border-left: 4px solid #15965a;
+  border-radius: 8px;
+  font-size: 0.94rem;
+  color: #112a1d;
+}
+
+.docs-code-container {
+  position: relative;
+  margin: 16px 0;
+  border-radius: 14px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.docs-code {
+  padding: 20px;
+  margin: 0;
+  color: #d4d4d4;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.docs-copy-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.docs-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.docs-endpoint-specs {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.specs-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+}
+
+.specs-label {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.specs-value {
+  color: var(--accent-deep);
+  font-family: monospace;
+}
+
+.method-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.method-badge.get {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.endpoint-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.endpoint-meta .path {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.docs-divider {
+  margin: 32px 0;
+  border: 0;
+  border-top: 1px dashed var(--line);
+}
+
+.docs-footer {
+  text-align: center;
+  padding: 40px 0;
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 960px) {
+  .docs-layout {
+    grid-template-columns: 1fr;
+  }
+  .docs-nav-sticky {
+    display: none;
+  }
+}
+
+
 .auth-transition-screen {
   min-height: 100vh;
   display: flex;

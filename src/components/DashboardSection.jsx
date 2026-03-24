@@ -102,19 +102,17 @@ export default function DashboardSection({
   const costEstimate = energyEstimate * 1444;
 
   const conditionLabel = useMemo(() => {
-    if (weatherFactor >= 0.85) return "Cerah";
-    if (weatherFactor >= 0.70) return "Cerah Berawan";
-    if (weatherFactor >= 0.45) return "Berawan";
-    if (weatherFactor >= 0.25) return "Mendung";
+    if (weatherFactor >= 1.05) return "Cerah";
+    if (weatherFactor >= 0.95) return "Cerah Berawan";
+    if (weatherFactor >= 0.75) return "Berawan";
+    if (weatherFactor >= 0.60) return "Mendung";
     return "Mendung Tebal";
   }, [weatherFactor]);
 
   const conditionImpact = useMemo(() => {
-    if (weatherFactor >= 0.85) return "produksi sangat optimal";
-    if (weatherFactor >= 0.70) return "produksi masih stabil & baik";
-    if (weatherFactor >= 0.45) return "produksi sedikit terhambat awan";
-    if (weatherFactor >= 0.25) return "produksi menurun akibat cuaca";
-    return "produksi berpotensi turun drastis";
+    if (weatherFactor >= 0.95) return "produksi optimal";
+    if (weatherFactor >= 0.70) return "potensi fluktuasi produksi";
+    return "produksi berpotensi turun akibat cuaca";
   }, [weatherFactor]);
 
   const todayHourlyDistribution = useMemo(() => {

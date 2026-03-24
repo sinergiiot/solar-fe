@@ -40,10 +40,10 @@ export default function ForecastSection({
   const deviationVsReference = forecast && comparisonActual && Number(comparisonActual.actual_kwh) > 0 ? ((predictedToday - Number(comparisonActual.actual_kwh)) / Number(comparisonActual.actual_kwh)) * 100 : null;
 
   // Use new API fields: cloud_cover_mean (percent), transmittance (0-1), baseline_type
-  const weatherRisk = !forecast ? { label: "--", tone: "neutral" } : getWeatherRisk(Number(forecast.transmittance || forecast.weather_factor));
+  const weatherRisk = !forecast ? { label: "--", tone: "neutral" } : getWeatherRisk(Number(forecast.weather_factor || 0));
   const activeProfile = profiles.find((p) => p.id === activeForecastProfileID) || profile || null;
   const hourlyEstimate = forecast
-    ? getHourlyDistribution(forecast.date, activeProfile?.lat, Number(forecast.transmittance || forecast.weather_factor)).map((slot) => ({
+    ? getHourlyDistribution(forecast.date, activeProfile?.lat, Number(forecast.weather_factor || 0)).map((slot) => ({
         label: slot.label,
         share: slot.share,
         value: predictedToday * slot.share,
@@ -91,14 +91,14 @@ export default function ForecastSection({
             <span className='metric-help' title='Rata-rata persentase tutupan awan harian (0-100%).'>
               ?
             </span>
-            <strong>{forecast ? Number(forecast.cloud_cover_mean).toFixed(1) + "%" : "--"}</strong>
+            <strong>{forecast ? Number(forecast.cloud_cover_mean || forecast.cloud_cover || 0).toFixed(1) + "%" : "--"}</strong>
           </div>
           <div>
             <span className='metric-label'>Weather Factor (Transmittance)</span>
             <span className='metric-help' title='Faktor transmittance atmosfer (0-1), hasil kalibrasi baseline cuaca harian.'>
               ?
             </span>
-            <strong>{forecast ? Number(forecast.transmittance).toFixed(2) : "--"}</strong>
+            <strong>{forecast ? Number(forecast.weather_factor || 0).toFixed(2) : "--"}</strong>
           </div>
           <div>
             <span className='metric-label'>Baseline Type</span>

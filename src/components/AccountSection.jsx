@@ -14,7 +14,8 @@ export default function AccountSection({
   isLoadingAPIKeys = false,
   isSavingAPIKey = false,
   onCreateAPIKey,
-  onDeleteAPIKey
+  onDeleteAPIKey,
+  onNavigate
 }) {
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState("");
@@ -162,14 +163,13 @@ export default function AccountSection({
             <span className='panel-kicker'>Developer</span>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
               <h2>API Key Management</h2>
-              <a 
-                href="/docs/api-guide.md" 
-                target="_blank" 
-                rel="noopener noreferrer"
+              <button 
+                type="button" 
                 className="docs-link"
+                onClick={() => onNavigate("docs")}
               >
                 <FiFileText /> Dokumentasi API
-              </a>
+              </button>
             </div>
           </div>
 
