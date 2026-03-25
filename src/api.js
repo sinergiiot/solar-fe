@@ -300,6 +300,10 @@ export function adminUpdateUserTier(userID, planTier) {
   });
 }
 
+export function adminGetStats() {
+  return request("/admin/stats");
+}
+
 // listAPIKeys fetches all user API keys.
 export function listAPIKeys() {
   return request("/api-keys");
@@ -320,4 +324,167 @@ export function deleteAPIKey(keyID) {
   });
 }
 
+// initiateCheckout starts a Midtrans payment session for Pro/Enterprise tier.
+export function initiateCheckout(planTier) {
+  return request("/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan_tier: planTier }),
+  });
+}
+
+// getSubscriptionStatus fetches current user subscription and proactively checks for payment updates.
+export function getSubscriptionStatus() {
+  return request("/billing/subscription");
+}
+
+export function cancelSubscription() {
+  return request("/billing/subscription/cancel", { method: "POST" });
+}
+
 export { API_BASE_URL };
+
+export async function updateBranding(companyName, logoFile) {
+  const token = getStoredToken();
+  const formData = new FormData();
+  formData.append("company_name", companyName);
+  if (logoFile) {
+    formData.append("logo", logoFile);
+  }
+
+  const response = await fetch(`${API_BASE_URL}/users/me/branding`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`
+    },
+    body: formData,
+  });
+  
+  const contentType = response.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json") ? await response.json() : await response.text();
+
+  if (!response.ok) {
+    const message = typeof payload === "object" && payload !== null && "error" in payload ? payload.error : "Request failed";
+    throw new Error(message);
+  }
+  return payload;
+}
+
+// getRECReadiness fetches the user's MWh accumulator and REC progress.
+export function getRECReadiness() {
+  return request("/accumulator/rec-readiness");
+}
+
+export async function downloadRECCertificate() {
+  const token = getStoredToken();
+  const response = await fetch(`${API_BASE_URL}/report/rec/pdf?type=certificate`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Gagal mengunduh sertifikat REC");
+  const blob = await response.blob();
+  saveBlob(blob, `REC_Certificate_${new Date().getTime()}.pdf`);
+}
+
+export async function downloadRECReadinessReport() {
+  const token = getStoredToken();
+  const response = await fetch(`${API_BASE_URL}/report/rec/pdf?type=report`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Gagal mengunduh laporan REC Readiness");
+  const blob = await response.blob();
+  saveBlob(blob, `REC_Readiness_Report_${new Date().getTime()}.pdf`);
+}
+
+function saveBlob(blob, name) {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+// getESGSummary fetches comprehensive corporate sustainability stats (Enterprise only).
+export function getESGSummary(params = {}) {
+  return request(`/report/esg${buildQueryString(params)}`);
+}
+
+export function downloadESGReportPDF(params = {}) {
+  const token = getStoredToken();
+  const url = `${API_BASE_URL}/report/esg/pdf${buildQueryString(params)}`;
+  
+  return fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${token}`
+    }
+  }).then(res => {
+    if (!res.ok) throw new Error("Gagal download report");
+    return res.blob();
+  }).then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ESG_Report_${params.year || ""}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  });
+}
+
+export function downloadHistoryCSV(params = {}) {
+  const token = getStoredToken();
+  const url = `${API_BASE_URL}/report/history/csv${buildQueryString(params)}`;
+  
+  return fetch(url, {
+    headers: {
+      "Authorization": `Bearer ${token}`
+    }
+  }).then(res => {
+    if (!res.ok) throw new Error("Gagal download CSV");
+    return res.blob();
+  }).then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `History_Export_${params.start_date || ""}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  });
+}
+
+// ESG Public Share (E5-T6)
+export function getESGShareStatus() {
+  return request("/users/me/esg-share");
+}
+
+export function enableESGShare() {
+  return request("/users/me/esg-share/enable", { method: "POST" });
+}
+
+export function disableESGShare() {
+  return request("/users/me/esg-share/disable", { method: "POST" });
+}
+
+export function getPublicESGSummary(token, year) {
+  const q = year ? `?year=${year}` : "";
+  return request(`/public/esg/${token}${q}`);
+}
+
+// getCO2Summary fetches CO2 avoided summary with carbon credit estimate (Pro/Enterprise).
+export function getCO2Summary(params = {}) {
+  return request(`/report/co2${buildQueryString(params)}`);
+}
+
+// downloadMRVPDF downloads the MRV CO2 Avoided PDF report.
+export async function downloadMRVPDF(params = {}) {
+  const token = getStoredToken();
+  const query = buildQueryString(params);
+  const response = await fetch(`${API_BASE_URL}/report/co2/pdf${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new Error("Gagal mengunduh MRV Report");
+  return response.blob();
+}

@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiAlertCircle, FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp } from "react-icons/fi";
+import { FiAlertCircle, FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp, FiFileText, FiAward, FiThermometer, FiZap, FiArrowRight } from "react-icons/fi";
 import { formatDateID, formatIDR, getHourlyDistribution } from "../utils";
+import TierBadge from "./TierBadge";
+
+// getEmissionFactor returns the CO2 emission factor (kg CO2/kWh) based on ESDM 2023 data for Indonesia.
+export function getEmissionFactor(lat, lng) {
+  if (lat >= -9.0 && lat <= -5.0 && lng >= 105.0 && lng <= 116.0) return 0.87; // JAMALI
+  if (lat >= -6.0 && lat <= 6.0 && lng >= 95.0 && lng <= 106.0) return 0.81; // SUMATERA
+  if (lat >= -4.0 && lat <= 5.0 && lng >= 108.0 && lng <= 119.0) return 0.84; // KALIMANTAN
+  if (lat >= -6.0 && lat <= 2.0 && lng >= 118.0 && lng <= 127.0) return 0.72; // SULAWESI
+  if (lat >= -11.0 && lat <= 0.0 && lng >= 116.0 && lng <= 141.0) return 0.68; // MALUKU/PAPUA
+  return 0.78; // National Avg
+}
 
 // DashboardSection renders heartbeat, summary, and latest 7-day snapshot tables.
 export default function DashboardSection({ 
   heartbeatSummary, 
   summary, 
+  recReadiness,
   dashboardForecastHistory, 
   dashboardActualHistory, 
   todayForecast, 
@@ -13,7 +25,9 @@ export default function DashboardSection({
   profiles = [],
   actualHistory = [],
   notificationPreference,
-  onNavigate
+  onNavigate,
+  onDownloadREC,
+  onDownloadRECReport
 }) {
   const [isOnboardingCollapsed, setIsOnboardingCollapsed] = useState(false);
 
@@ -251,6 +265,13 @@ export default function DashboardSection({
                   <strong className='metric-value'>{todayForecast.weather_risk_status || "Stabil"}</strong>
                   <span className='metric-sublabel'>berdasarkan cloud & ΔWF</span>
                 </div>
+                <div className='summary-card' style={{ background: 'var(--green-soft)', border: '1px solid var(--green)' }}>
+                  <span className='metric-label' style={{ color: 'var(--green-dark)' }}>Impact Karbon Hari Ini</span>
+                  <strong className='metric-value' style={{ color: 'var(--green-dark)' }}>
+                    {(energyEstimate * getEmissionFactor(latitude, longitude)).toFixed(2)} kg CO2
+                  </strong>
+                  <span className='metric-sublabel'>potensi pengurangan emisi harian</span>
+                </div>
               </div>
             </div>
 
@@ -278,6 +299,100 @@ export default function DashboardSection({
             <button className='primary-button' onClick={() => onNavigate("forecast")}>
               Klik untuk Ambil Forecast Baru
             </button>
+          </div>
+        )}
+      </section>
+
+      {/* REC Readiness Widget */}
+      <section className='panel panel-wide summary-panel' style={{ position: 'relative' }}>
+        <div className='panel-heading'>
+          <span className='panel-kicker'>Sustainability</span>
+          <h2>MWh Accumulator & REC Readiness</h2>
+        </div>
+        
+        {recReadiness ? (
+          <div style={{ marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span>Total Produksi Tersimpan: <strong>{recReadiness.total_mwh.toFixed(3)} MWh</strong></span>
+              <span><strong>{recReadiness.progress_to_next_pct.toFixed(1)}%</strong> menuju REC berikutnya</span>
+            </div>
+            <div className='forecast-hourly-bar-track' style={{ height: '12px', background: 'var(--line)', borderRadius: '6px', overflow: 'hidden' }}>
+              <div 
+                className='forecast-hourly-bar-fill' 
+                style={{ width: `${Math.min(100, recReadiness.progress_to_next_pct)}%`, background: 'var(--success)', height: '100%' }} 
+              />
+            </div>
+            
+            <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div className='summary-card' style={{ flex: '1', minWidth: '150px' }}>
+                <span className='metric-label'>Total Kumulatif Energi</span>
+                <strong className='metric-value'>{recReadiness.total_kwh.toFixed(1)} kWh</strong>
+              </div>
+              <div className='summary-card' style={{ flex: '1', minWidth: '150px' }}>
+                <span className='metric-label'>Sertifikat (REC) Tercapai</span>
+                <strong className='metric-value'>{recReadiness.total_rec} REC</strong>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '16px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+              <div className='summary-card' style={{ flex: '1', minWidth: '150px', background: 'var(--green-soft)', border: '1px solid var(--green)' }}>
+                <span className='metric-label' style={{ color: 'var(--green-dark)' }}>Setara Pohon Ditanam</span>
+                <strong className='metric-value' style={{ color: 'var(--green-dark)' }}>
+                  {Math.floor(recReadiness.total_kwh * getEmissionFactor(latitude, longitude) / 20)} Pohon
+                </strong>
+                <span className='metric-sublabel'>estimasi serapan CO2/tahun</span>
+              </div>
+              <div className='summary-card' style={{ flex: '1', minWidth: '150px', background: 'var(--green-soft)', border: '1px solid var(--green)' }}>
+                <span className='metric-label' style={{ color: 'var(--green-dark)' }}>Perjalanan Mobil Dihindari</span>
+                <strong className='metric-value' style={{ color: 'var(--green-dark)' }}>
+                  {Math.floor(recReadiness.total_kwh * getEmissionFactor(latitude, longitude) / 0.2)}.1 km
+                </strong>
+                <span className='metric-sublabel'>asumsi 200g CO2/km</span>
+              </div>
+            </div>
+
+            {/* Lock state for Free Tier if 1 REC reached */}
+            {notificationPreference?.plan_tier === "free" && recReadiness.total_rec > 0 && (
+              <div className='banner banner-error' style={{ marginTop: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <FiAlertCircle />
+                  <strong>Selamat! Anda telah menghasilkan 1 REC pertama.</strong>
+                </div>
+                <p style={{ marginTop: '4px', fontSize: '0.9rem' }}>
+                  Akun Free tidak dapat mengunduh Laporan Klaim Sertifikat (REC). Upgrade ke Pro/Enterprise untuk membuka klaim dan laporan resmi!
+                </p>
+                <div style={{ marginTop: '8px' }}>
+                  <TierBadge tier="pro" /> <TierBadge tier="enterprise" />
+                </div>
+              </div>
+            )}
+            {notificationPreference?.plan_tier !== "free" && recReadiness.total_rec > 0 && (
+               <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <p style={{ fontSize: '0.9rem', color: 'var(--success)' }}>
+                    Sertifikat (REC) dapat dicetak melalui Laporan Tahunan di menu <strong style={{cursor: 'pointer', textDecoration: 'underline'}} onClick={() => onNavigate("report")}>Laporan Hijau / ESG</strong>.
+                  </p>
+                <div style={{ marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <button 
+                    className='primary-button' 
+                    style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    onClick={onDownloadREC}
+                  >
+                    <FiAward /> Download Sertifikat
+                  </button>
+                  <button 
+                    className='secondary-button' 
+                    style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '8px' }}
+                    onClick={onDownloadRECReport}
+                  >
+                    <FiFileText /> Download Readiness Report
+                  </button>
+                </div>
+               </div>
+            )}
+          </div>
+        ) : (
+          <div className='empty-state' style={{ padding: '20px', textAlign: 'center' }}>
+            Memuat data accumulator...
           </div>
         )}
       </section>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { FiKey, FiPlus, FiTrash2, FiFileText } from "react-icons/fi";
+import { FiKey, FiPlus, FiTrash2, FiFileText, FiImage } from "react-icons/fi";
+import { updateBranding } from "../api";
 import TierBadge from "./TierBadge";
 
 // AccountSection renders account info and notification preference form.
@@ -15,10 +16,24 @@ export default function AccountSection({
   isSavingAPIKey = false,
   onCreateAPIKey,
   onDeleteAPIKey,
+  onToggleESGShare,
+  onCancelSubscription,
   onNavigate
 }) {
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState("");
+  
+  const [companyName, setCompanyName] = useState(currentUser?.company_name || "");
+  const [logoFile, setLogoFile] = useState(null);
+  const [isSavingBranding, setIsSavingBranding] = useState(false);
+  const [brandingFeedback, setBrandingFeedback] = useState("");
+  const [isTogglingESG, setIsTogglingESG] = useState(false);
+
+  const handleToggleESG = async () => {
+    setIsTogglingESG(true);
+    await onToggleESGShare(!currentUser?.esg_share_enabled);
+    setIsTogglingESG(false);
+  };
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -27,6 +42,21 @@ export default function AccountSection({
     if (key) {
       setGeneratedKey(key);
       setNewKeyName("");
+    }
+  };
+
+  const handleSaveBranding = async (e) => {
+    e.preventDefault();
+    setIsSavingBranding(true);
+    setBrandingFeedback("");
+    try {
+      const resp = await updateBranding(companyName, logoFile);
+      setBrandingFeedback("Branding berhasil disimpan.");
+      // Ideally update currentUser but a refresh works or just let it be.
+    } catch (err) {
+      setBrandingFeedback("Gagal menyimpan: " + err.message);
+    } finally {
+      setIsSavingBranding(false);
     }
   };
   return (
@@ -62,32 +92,35 @@ export default function AccountSection({
           <div className='empty-state'>Memuat pengaturan notifikasi...</div>
         ) : (
           <form className='stack account-notification-form' onSubmit={handleSaveNotificationPreference}>
-            <label>
-              <span>Plan tier</span>
-              <select
-                value={notificationPreference.plan_tier === "paid" ? "pro" : notificationPreference.plan_tier}
-                onChange={(event) => {
-                  const nextPlan = event.target.value;
-                  setNotificationPreference((current) => ({
-                    ...current,
-                    plan_tier: nextPlan,
-                    ...(nextPlan === "free"
-                      ? {
-                          whatsapp_enabled: false,
-                          whatsapp_opted_in: false,
-                          ...(current.primary_channel === "whatsapp" ? { primary_channel: "email" } : {}),
-                        }
-                      : {}),
-                  }));
-                }}>
-                <option value='free'>Free (Basic)</option>
-                <option value='pro'>Pro (Personal & Advanced)</option>
-                <option value='enterprise'>Enterprise (Business & API)</option>
-              </select>
-              <div style={{ marginTop: '4px' }}>
+            <div style={{ display: 'grid', gap: '8px' }}>
+              <span style={{ fontSize: '0.94rem', color: 'var(--muted)' }}>Plan tier</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255, 255, 255, 0.82)', border: '1px solid rgba(85, 67, 49, 0.16)', padding: '10px 16px', borderRadius: '16px' }}>
                 <TierBadge tier={notificationPreference.plan_tier} />
+                <button 
+                  type="button" 
+                  className="secondary-button" 
+                  style={{ marginLeft: 'auto', padding: '6px 14px', fontSize: '0.85rem' }} 
+                  onClick={() => onNavigate && onNavigate("pricing")}
+                >
+                  Ganti Paket
+                </button>
+                {notificationPreference.plan_tier !== "free" && (
+                  <button 
+                    type="button" 
+                    className="secondary-button danger-light" 
+                    style={{ padding: '6px 14px', fontSize: '0.85rem' }} 
+                    onClick={() => onCancelSubscription && onCancelSubscription()}
+                  >
+                    Batalkan
+                  </button>
+                )}
               </div>
-            </label>
+              {notificationPreference.plan_tier !== "free" && notificationPreference.plan_expires_at && (
+                <div style={{ fontSize: '0.8rem', color: 'var(--muted)', marginTop: '4px', textAlign: 'right' }}>
+                  Berlaku hingga: <strong>{new Date(notificationPreference.plan_expires_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
+                </div>
+              )}
+            </div>
 
             <label>
               <span>Primary channel</span>
@@ -156,6 +189,99 @@ export default function AccountSection({
           </form>
         )}
       </div>
+
+      {notificationPreference.plan_tier === "enterprise" && (
+        <div className='account-notification-block' style={{ marginTop: '40px' }}>
+          <div className='panel-heading'>
+            <span className='panel-kicker'>Branding</span>
+            <h2>White-label Perusahaan</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '4px' }}>Sesuaikan logo dan nama perusahaan untuk Kop Surat & PDF Laporan.</p>
+          </div>
+
+          <form className='stack account-notification-form' onSubmit={handleSaveBranding}>
+            <label>
+              <span>Nama Perusahaan / Organisasi</span>
+              <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder='PT Sinergi Energi' />
+            </label>
+            <label>
+              <span>Logo Perusahaan (PNG/JPG, maks 2MB)</span>
+              <input type='file' accept="image/png, image/jpeg" onChange={(e) => setLogoFile(e.target.files[0])} />
+            </label>
+            
+            {currentUser?.company_logo_url && !logoFile && (
+               <div style={{ marginTop: '8px' }}>
+                 <span style={{ fontSize: '0.85rem', color: 'var(--muted)', display: 'block', marginBottom: '8px' }}>Logo saat ini:</span>
+                 <img src={currentUser.company_logo_url} alt="Current logo" style={{ maxHeight: '60px', borderRadius: '8px', border: '1px solid var(--line)' }} />
+               </div>
+            )}
+
+            <button className='primary-button' type='submit' disabled={isSavingBranding} style={{ display: 'flex', alignItems: 'center', gap: '8px', width: 'fit-content' }}>
+              <FiImage /> {isSavingBranding ? "Menyimpan..." : "Simpan Branding"}
+            </button>
+            {brandingFeedback && <div style={{ fontSize: '0.9rem', color: brandingFeedback.includes("Gagal") ? "var(--error)" : "var(--success)", marginTop: '8px' }}>{brandingFeedback}</div>}
+          </form>
+        </div>
+      )}
+
+      {notificationPreference.plan_tier === "enterprise" && (
+        <div className='account-notification-block' style={{ marginTop: '40px' }}>
+          <div className='panel-heading'>
+            <span className='panel-kicker'>Reporting</span>
+            <h2>ESG Public Share</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '4px' }}>Bagikan dashboard ESG Anda secara publik untuk transparansi stakeholder.</p>
+          </div>
+          
+          <div className='stack account-notification-form' style={{ gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <label className="switch">
+                <input 
+                  type="checkbox" 
+                  checked={currentUser?.esg_share_enabled} 
+                  onChange={handleToggleESG}
+                  disabled={isTogglingESG}
+                />
+                <span className="slider round"></span>
+              </label>
+              <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>
+                {currentUser?.esg_share_enabled ? "Akses Publik AKTIF" : "Buka Akses Publik"}
+              </span>
+            </div>
+
+            {currentUser?.esg_share_enabled && currentUser?.esg_share_token && (
+              <div style={{ 
+                background: 'rgba(255, 255, 255, 0.05)', 
+                padding: '16px', 
+                borderRadius: '8px', 
+                border: '1px dashed var(--line)',
+                fontSize: '0.9rem'
+              }}>
+                <div style={{ color: 'var(--muted)', marginBottom: '8px' }}>URL Public Report:</div>
+                <div style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px', 
+                  color: 'var(--primary)',
+                  fontWeight: '600',
+                  wordBreak: 'break-all',
+                  justifyContent: 'space-between'
+                }}>
+                  <span>{`${window.location.origin}/public/esg/${currentUser.esg_share_token}`}</span>
+                  <button 
+                    className="secondary-button" 
+                    style={{ padding: '6px 12px', fontSize: '0.8rem', minWidth: 'auto' }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/public/esg/${currentUser.esg_share_token}`);
+                      alert("Link tersalin!");
+                    }}
+                  >
+                    Salin
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {notificationPreference.plan_tier === "enterprise" && (
         <div className='account-notification-block' style={{ marginTop: '40px' }}>

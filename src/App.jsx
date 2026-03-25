@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FiAlertCircle, FiBarChart2, FiCheckCircle, FiCode, FiCpu, FiFileText, FiHome, FiLogOut, FiMenu, FiSettings, FiShield, FiSun, FiUser, FiX } from "react-icons/fi";
+import { FiAlertCircle, FiBarChart2, FiCheckCircle, FiCloud, FiCode, FiCpu, FiFileText, FiGlobe, FiHome, FiLogOut, FiMenu, FiSettings, FiShield, FiSun, FiUser, FiX, FiZap } from "react-icons/fi";
 
 import {
   createSolarProfile,
@@ -34,6 +34,16 @@ import {
   listAPIKeys,
   createAPIKey,
   deleteAPIKey,
+  getRECReadiness,
+  downloadRECCertificate,
+  downloadRECReadinessReport,
+  getESGSummary,
+  initiateCheckout,
+  getSubscriptionStatus,
+  enableESGShare,
+  disableESGShare,
+  getPublicESGSummary,
+  cancelSubscription,
 } from "./api";
 import { getDateDaysAgo, getHistoryRowKey, getHourlyDistribution, getTodayLocalDate, getWeatherRisk } from "./utils";
 import AccountSection from "./components/AccountSection";
@@ -44,11 +54,15 @@ import HistorySection from "./components/HistorySection";
 import IntegrationSection from "./components/IntegrationSection";
 import ProfileSection from "./components/ProfileSection";
 import ReportSection from "./components/ReportSection";
+import ESGSection from "./components/ESGSection";
+import PricingSection from "./components/PricingSection";
 import AdminSection from "./components/AdminSection";
 import DocsSection from "./components/DocsSection";
 import LandingVideo from "./components/LandingVideo";
 import LandingFooter from "./components/LandingFooter";
 import TierBadge from "./components/TierBadge";
+import CO2TrackerSection from "./components/CO2TrackerSection";
+import PublicESGView from "./components/PublicESGView";
 
 const emptyRegisterForm = {
   name: "",
@@ -114,6 +128,11 @@ const onboardingModalSnoozeMs = 24 * 60 * 60 * 1000;
 
 // App renders auth and dashboard flows with user-separated data.
 export default function App() {
+  const isPublicESG = window.location.pathname.startsWith("/public/esg/");
+  if (isPublicESG) {
+    return <PublicESGView />;
+  }
+
   const [token, setToken] = useState(getStoredToken());
   const [currentUser, setCurrentUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -139,6 +158,8 @@ export default function App() {
   const [apiKeys, setAPIKeys] = useState([]);
   const [isSavingAPIKey, setIsSavingAPIKey] = useState(false);
   const [isLoadingAPIKeys, setIsLoadingAPIKeys] = useState(false);
+  const [recReadiness, setRecReadiness] = useState(null);
+  const [isDownloadingREC, setIsDownloadingREC] = useState(false);
 
   const [registerForm, setRegisterForm] = useState(emptyRegisterForm);
   const [loginForm, setLoginForm] = useState(emptyLoginForm);
@@ -252,6 +273,28 @@ export default function App() {
   }, [token, selectedForecastProfileID]);
 
   useEffect(() => {
+    if (!token) return;
+
+    // Handle Midtrans redirect params
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("transaction_status");
+    const orderID = params.get("order_id");
+
+    if (status === "settlement" || status === "capture") {
+      setFeedback("Pembayaran berhasil! Mengaktifkan paket Pro Anda...");
+      // Proactively reload to trigger the backend status check
+      loadAuthenticatedDashboard();
+      loadNotificationPreference();
+      // Clean up URL
+      window.history.replaceState({}, document.title, "/dashboard");
+    } else if (status === "pending") {
+      setFeedback("Menunggu pembayaran Anda...");
+    } else if (status === "error" || status === "failure") {
+      setError("Terjadi kesalahan pada pembayaran Anda.");
+    }
+  }, [token]);
+
+  useEffect(() => {
     if (!feedback) {
       clearTimeout(feedbackTimeoutRef.current);
       clearTimeout(feedbackFadeRef.current);
@@ -321,8 +364,13 @@ export default function App() {
 
       // Load summary and dashboard snapshot data (fixed scope)
       try {
-        const summaryData = await getDashboardSummary();
+        await loadNotificationPreference(); // Refresh tier
+        const [summaryData, recData] = await Promise.all([
+          getDashboardSummary(),
+          getRECReadiness().catch(() => null),
+        ]);
         setSummary(summaryData);
+        if (recData) setRecReadiness(recData);
       } catch {
         setSummary(null);
       }
@@ -429,9 +477,13 @@ export default function App() {
     setActualForm(emptyActualForm);
     setEditingProfileID("");
     setEditingDeviceID("");
+    setActualForm(emptyActualForm);
+    setEditingProfileID("");
+    setEditingDeviceID("");
     setEditingDeviceIsActive(true);
     setDeletingProfileID("");
     setDeletingDeviceID("");
+    setRecReadiness(null);
     setNotificationPreference(emptyNotificationPreference);
     setFeedback("");
     setError("");
@@ -463,8 +515,10 @@ export default function App() {
 
   async function loadNotificationPreference() {
     setIsLoadingNotificationPreference(true);
-
     try {
+      // Proactively check subscription status (triggers backend Midtrans check if pending)
+      await getSubscriptionStatus().catch(() => null);
+
       const result = await getNotificationPreferences();
       setNotificationPreference({
         plan_tier: result.plan_tier || "free",
@@ -472,11 +526,12 @@ export default function App() {
         email_enabled: Boolean(result.email_enabled),
         telegram_enabled: Boolean(result.telegram_enabled),
         whatsapp_enabled: Boolean(result.whatsapp_enabled),
-        telegram_chat_id: result.telegram_chat_id || "",
         whatsapp_phone_e164: result.whatsapp_phone_e164 || "",
         whatsapp_opted_in: Boolean(result.whatsapp_opted_in),
+        telegram_chat_id: result.telegram_chat_id || "",
         timezone: result.timezone || "Asia/Jakarta",
         preferred_send_time: result.preferred_send_time || "06:00:00",
+        plan_expires_at: result.plan_expires_at,
       });
     } catch (loadError) {
       setError(loadError.message);
@@ -549,6 +604,37 @@ export default function App() {
       await loadAPIKeys();
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  async function handleToggleESGShare(enabled) {
+    try {
+      if (enabled) {
+        const res = await enableESGShare();
+        setCurrentUser(prev => ({ ...prev, esg_share_enabled: true, esg_share_token: res.token }));
+      } else {
+        await disableESGShare();
+        setCurrentUser(prev => ({ ...prev, esg_share_enabled: false }));
+      }
+      setFeedback(enabled ? "ESG Public Share diaktifkan!" : "ESG Public Share dinonaktifkan.");
+    } catch (err) {
+      setError(err.message || "Gagal mengubah status share.");
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!window.confirm("Apakah Anda yakin ingin membatalkan langganan? Fitur Pro/Enterprise akan segera dinonaktifkan.")) {
+      return;
+    }
+    setError("");
+    try {
+      await cancelSubscription();
+      // Reload sub status & pref
+      const sub = await getSubscriptionStatus();
+      setNotificationPreference(prev => ({ ...prev, plan_tier: sub.plan_tier, plan_expires_at: sub.expires_at }));
+      setFeedback("Langganan berhasil dibatalkan. Paket Anda kini kembali ke FREE.");
+    } catch (err) {
+      setError(err.message || "Gagal membatalkan langganan.");
     }
   }
 
@@ -1006,6 +1092,57 @@ export default function App() {
     }
   }
 
+  async function handleDownloadREC() {
+    if (isDownloadingREC) return;
+    setIsDownloadingREC(true);
+    setError("");
+    setFeedback("");
+    try {
+      await downloadRECCertificate();
+      setFeedback("Sertifikat REC berhasil diunduh.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsDownloadingREC(false);
+    }
+  }
+
+  async function handleDownloadRECReport() {
+    if (isDownloadingREC) return;
+    setIsDownloadingREC(true);
+    setError("");
+    setFeedback("");
+    try {
+      await downloadRECReadinessReport();
+      setFeedback("Laporan REC Readiness berhasil diunduh.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsDownloadingREC(false);
+    }
+  }
+
+  async function handleUpgrade(tier) {
+    if (tier === "free") return;
+    setError("");
+    setFeedback("");
+    setIsLoading(true);
+    try {
+      setFeedback(`Sedang menyiapkan pembayaran untuk paket ${tier.toUpperCase()}...`);
+      const res = await initiateCheckout(tier);
+      if (res && res.checkout_url) {
+        window.open(res.checkout_url, '_blank');
+        setFeedback(`Halaman pembayaran untuk paket ${tier.toUpperCase()} telah dibuka di tab baru.`);
+      } else {
+        throw new Error("Gagal mendapatkan link pembayaran.");
+      }
+      setIsLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setIsLoading(false);
+    }
+  }
+
   function handleNavigate(page) {
     setCurrentPage(page);
     if (typeof window !== "undefined" && window.innerWidth <= 980) {
@@ -1256,6 +1393,12 @@ export default function App() {
             </span>
             <span className='nav-label'>Dashboard</span>
           </button>
+          <button className={`nav-item ${currentPage === "esg" ? "active" : ""}`} onClick={() => handleNavigate("esg")}>
+            <span className='nav-icon'>
+              <FiGlobe />
+            </span>
+            <span className='nav-label'>ESG Impact Portfolio</span>
+          </button>
           <button className={`nav-item ${currentPage === "profile" ? "active" : ""}`} onClick={() => handleNavigate("profile")}>
             <span className='nav-icon'>
               <FiSettings />
@@ -1286,6 +1429,12 @@ export default function App() {
             </span>
             <span className='nav-label'>Laporan Hijau</span>
           </button>
+          <button className={`nav-item ${currentPage === "co2" ? "active" : ""}`} onClick={() => handleNavigate("co2")}>
+            <span className='nav-icon'>
+              <FiCloud />
+            </span>
+            <span className='nav-label'>CO2 Tracker</span>
+          </button>
           <button className={`nav-item ${currentPage === "account" ? "active" : ""}`} onClick={() => handleNavigate("account")}>
             <span className='nav-icon'>
               <FiUser />
@@ -1297,6 +1446,12 @@ export default function App() {
               <FiCode />
             </span>
             <span className='nav-label'>API Docs</span>
+          </button>
+          <button className={`nav-item ${currentPage === "pricing" ? "active" : ""}`} onClick={() => handleNavigate("pricing")}>
+            <span className='nav-icon'>
+              <FiZap style={{ color: 'var(--success)' }} />
+            </span>
+            <span className='nav-label'>Upgrade & Pricing</span>
           </button>
 
           {currentUser?.role === "admin" && (
@@ -1327,15 +1482,17 @@ export default function App() {
           <div>
             <div className='page-eyebrow' style={{ display: 'flex', alignItems: 'center' }}>
               {currentUser?.name || "User"}
-              <TierBadge tier={notificationPreference?.plan_tier} />
+              <TierBadge tier={notificationPreference?.plan_tier} onClick={() => handleNavigate("pricing")} />
             </div>
             <h1 className='page-title'>
               {currentPage === "dashboard" && "Dashboard"}
+              {currentPage === "pricing" && "Upgrade & Pricing"}
               {currentPage === "profile" && "Solar Profile"}
               {currentPage === "forecast" && "Forecast Hari Ini"}
               {currentPage === "history" && "Forecast History"}
               {currentPage === "integration" && "Integrasi Device"}
               {currentPage === "report" && "Laporan Hijau / ESG"}
+              {currentPage === "co2" && "CO2 Avoided Tracker & MRV"}
               {currentPage === "account" && "Account Info"}
               {currentPage === "docs" && "API Integration Guide"}
               {currentPage === "admin" && "Admin Dashboard"}
@@ -1360,6 +1517,7 @@ export default function App() {
             <DashboardSection
               heartbeatSummary={heartbeatSummary}
               summary={summary}
+              recReadiness={recReadiness}
               dashboardForecastHistory={dashboardForecastHistory}
               dashboardActualHistory={dashboardActualHistory}
               todayForecast={todayForecastDashboard}
@@ -1368,6 +1526,23 @@ export default function App() {
               actualHistory={actualHistory}
               notificationPreference={notificationPreference}
               onNavigate={handleNavigate}
+              onDownloadREC={handleDownloadREC}
+              onDownloadRECReport={handleDownloadRECReport}
+            />
+          )}
+
+          {currentPage === "pricing" && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <PricingSection 
+                currentTier={notificationPreference.plan_tier}
+                onUpgrade={handleUpgrade}
+              />
+            </div>
+          )}
+
+          {currentPage === "esg" && (
+            <ESGSection 
+              planTier={notificationPreference.plan_tier} 
             />
           )}
 
@@ -1462,7 +1637,9 @@ export default function App() {
             />
           )}
 
+          {currentPage === "esg" && <ESGSection planTier={notificationPreference.plan_tier} />}
           {currentPage === "report" && <ReportSection planTier={notificationPreference.plan_tier} profiles={profiles} />}
+          {currentPage === "co2" && <CO2TrackerSection planTier={notificationPreference.plan_tier} profiles={profiles} />}
           {currentPage === "account" && (
             <AccountSection
               currentUser={currentUser}
@@ -1476,6 +1653,8 @@ export default function App() {
               isSavingAPIKey={isSavingAPIKey}
               onCreateAPIKey={handleCreateAPIKey}
               onDeleteAPIKey={handleDeleteAPIKey}
+              onToggleESGShare={handleToggleESGShare}
+              onCancelSubscription={handleCancelSubscription}
               onNavigate={handleNavigate}
             />
           )}
