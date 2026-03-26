@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiAlertCircle, FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp, FiFileText, FiAward, FiThermometer, FiZap, FiArrowRight } from "react-icons/fi";
+import { FiAlertCircle, FiCheckCircle, FiCloud, FiCloudRain, FiCpu, FiEdit3, FiInfo, FiSun, FiTrendingDown, FiTrendingUp, FiFileText, FiAward, FiThermometer, FiZap, FiArrowRight, FiClock, FiShield, FiGlobe } from "react-icons/fi";
 import { formatDateID, formatIDR, getHourlyDistribution } from "../utils";
 import TierBadge from "./TierBadge";
 
@@ -239,38 +239,50 @@ export default function DashboardSection({
                 </p>
               </article>
 
-              <div className='today-condition-meta'>
-                <div className='summary-card'>
-                  <span className='metric-label'>Tanggal Forecast</span>
-                  <strong className='metric-value'>{todayForecast.date}</strong>
-                  <span className='metric-sublabel'>sinkron dari hasil forecast terbaru</span>
+              <div className='sun-grid'>
+                <div className='sun-card'>
+                   <div className="sun-card-title">
+                     <FiClock className="sun-card-accent" /> Tanggal Forecast
+                   </div>
+                   <span className='sun-card-value'>{todayForecast.date}</span>
+                   <p className='sun-card-sub'>Sinkronisasi terbaru</p>
                 </div>
-                <div className='summary-card'>
-                  <span className='metric-label'>Estimasi Produksi</span>
-                  <strong className='metric-value'>{energyEstimate.toFixed(2)} kWh</strong>
-                  <span className='metric-sublabel'>estimasi energi hari ini</span>
+                <div className='sun-card'>
+                   <div className="sun-card-title">
+                     <FiZap className="sun-card-accent" /> Estimasi Produksi
+                   </div>
+                   <span className='sun-card-value text-gradient'>{energyEstimate.toFixed(2)} kWh</span>
+                   <p className='sun-card-sub'>Total prediksi energi harian</p>
                 </div>
-                <div className='summary-card'>
-                  <span className='metric-label'>Weather Factor</span>
-                  <strong className='metric-value'>{weatherFactor.toFixed(2)}</strong>
-                  <span className='metric-sublabel'>indikasi dampak cuaca ke produksi</span>
+                <div className='sun-card'>
+                   <div className="sun-card-title">
+                     <FiSun className="sun-card-accent" /> Weather Impact
+                   </div>
+                   <span className='sun-card-value'>{weatherFactor.toFixed(2)}×</span>
+                   <p className='sun-card-sub'>Efisiensi cuaca terhadap panel</p>
                 </div>
-                <div className='summary-card'>
-                  <span className='metric-label'>Estimasi Penghematan</span>
-                  <strong className='metric-value'>{formatIDR(costEstimate)}</strong>
-                  <span className='metric-sublabel'>asumsi tarif Rp 1.444 / kWh</span>
+                <div className='sun-card'>
+                   <div className="sun-card-title">
+                     <FiTrendingUp className="sun-card-accent" /> Estimasi Hemat
+                   </div>
+                   <span className='sun-card-value'>{formatIDR(costEstimate)}</span>
+                   <p className='sun-card-sub'>Potensi hemat biaya listrik</p>
                 </div>
-                <div className='summary-card'>
-                  <span className='metric-label'>Status Risiko Cuaca</span>
-                  <strong className='metric-value'>{todayForecast.weather_risk_status || "Stabil"}</strong>
-                  <span className='metric-sublabel'>berdasarkan cloud & ΔWF</span>
+                <div className='sun-card' style={{ borderLeftWidth: '6px', borderLeftColor: 'var(--accent)' }}>
+                   <div className="sun-card-title">
+                     <FiShield className="sun-card-accent" /> Status Risiko
+                   </div>
+                   <span className='sun-card-value' style={{ fontSize: '1.5rem' }}>{todayForecast.weather_risk_status || "Stabil"}</span>
+                   <p className='sun-card-sub'>Analisis cloud & fluktuasi</p>
                 </div>
-                <div className='summary-card' style={{ background: 'var(--green-soft)', border: '1px solid var(--green)' }}>
-                  <span className='metric-label' style={{ color: 'var(--green-dark)' }}>Impact Karbon Hari Ini</span>
-                  <strong className='metric-value' style={{ color: 'var(--green-dark)' }}>
-                    {(energyEstimate * getEmissionFactor(latitude, longitude)).toFixed(2)} kg CO2
-                  </strong>
-                  <span className='metric-sublabel'>potensi pengurangan emisi harian</span>
+                <div className='sun-card' style={{ borderColor: 'var(--green)', borderLeftWidth: '6px' }}>
+                   <div className="sun-card-title">
+                     <FiGlobe style={{ color: 'var(--green)' }} /> Impact Karbon
+                   </div>
+                   <span className='sun-card-value' style={{ color: 'var(--green-dark)' }}>
+                     {(energyEstimate * getEmissionFactor(latitude, longitude)).toFixed(2)} kg
+                   </span>
+                   <p className='sun-card-sub'>Estimasi CO₂ avoided hari ini</p>
                 </div>
               </div>
             </div>
