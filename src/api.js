@@ -304,6 +304,56 @@ export function adminGetStats() {
   return request("/admin/stats");
 }
 
+export function adminImpersonateUser(userID) {
+  return request(`/admin/users/${userID}/impersonate`, {
+    method: "POST",
+  });
+}
+
+export function adminGetExpiringSubscriptions(days = 7) {
+  return request(`/admin/subscriptions/expiring?days=${days}`);
+}
+
+export function adminGetSchedulerStatus(limit = 50) {
+  return request(`/admin/scheduler/status?limit=${limit}`);
+}
+
+export function adminGetForecastQuality() {
+  return request("/admin/forecast-quality");
+}
+
+export function adminGetColdStartSites() {
+  return request("/admin/cold-start-monitor");
+}
+
+export function adminGetNotificationLogs(limit = 50) {
+  return request(`/admin/notification-logs?limit=${limit}`);
+}
+
+export function adminGetDataAnomalies() {
+  return request("/admin/data-anomalies");
+}
+
+export function adminGetAggregateAnalytics(days = 30) {
+  return request(`/admin/analytics/aggregate?days=${days}`);
+}
+
+export function adminGetSiteRankings(limit = 10) {
+  return request(`/admin/analytics/ranking?limit=${limit}`);
+}
+
+export function adminGetTierDistribution() {
+  return request("/admin/analytics/tier-distribution");
+}
+
+export function adminGetWeatherHealth() {
+  return request("/admin/weather/health");
+}
+
+export function adminGetAuditLogs(limit = 100) {
+  return request(`/admin/audit-logs?limit=${limit}`);
+}
+
 // listAPIKeys fetches all user API keys.
 export function listAPIKeys() {
   return request("/api-keys");
