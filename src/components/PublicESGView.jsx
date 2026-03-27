@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { FiSun, FiZap, FiCheckCircle, FiPackage, FiGlobe, FiMapPin, FiAward } from "react-icons/fi";
-import { getPublicESGSummary } from "../api";
+import { getPublicESGSummary, API_BASE_URL } from "../api";
 
 export default function PublicESGView() {
   const token = window.location.pathname.split("/").pop();
@@ -16,7 +16,7 @@ export default function PublicESGView() {
   async function loadPublicData() {
     setLoading(true);
     try {
-      const res = await getPublicESGSummary(token, { year });
+      const res = await getPublicESGSummary(token, year);
       setData(res);
     } catch (err) {
       setError(err.message || "Laporan ESG tidak ditemukan atau sudah dinonaktifkan.");
@@ -56,7 +56,7 @@ export default function PublicESGView() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
             <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
               {company_logo ? (
-                <img src={company_logo} alt={company_name} style={{ height: '64px', borderRadius: '12px' }} />
+                <img src={`${API_BASE_URL}${company_logo}`} alt={company_name} style={{ height: '64px', borderRadius: '12px', objectFit: 'contain' }} />
               ) : (
                 <div style={{ padding: '16px', background: 'var(--green-soft)', borderRadius: '12px', color: 'var(--green)' }}>
                    <FiGlobe size={32} />

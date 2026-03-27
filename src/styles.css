@@ -150,7 +150,7 @@ select {
 /* ── API Documentation (DocsSection) ──────────────────────────────────── */
 .docs-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: 32px;
   align-items: start;
 }
@@ -204,6 +204,7 @@ select {
 .docs-content {
   display: grid;
   gap: 24px;
+  min-width: 0;
 }
 
 .docs-card {
@@ -212,6 +213,7 @@ select {
   background: var(--panel);
   border: 1px solid var(--line);
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .docs-header-hero {
@@ -374,6 +376,12 @@ select {
   }
   .docs-nav-sticky {
     display: none;
+  }
+  .docs-card {
+    padding: 20px 16px;
+  }
+  .docs-code {
+    font-size: 0.78rem;
   }
 }
 

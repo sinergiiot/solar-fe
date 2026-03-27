@@ -44,6 +44,7 @@ import {
   disableESGShare,
   getPublicESGSummary,
   cancelSubscription,
+  updateBranding,
 } from "./api";
 import { getDateDaysAgo, getHistoryRowKey, getHourlyDistribution, getTodayLocalDate, getWeatherRisk } from "./utils";
 import AccountSection from "./components/AccountSection";
@@ -199,7 +200,13 @@ export default function App() {
   const [feedback, setFeedback] = useState("");
   const [feedbackFading, setFeedbackFading] = useState(false);
   const [error, setError] = useState("");
-  const [currentPage, setCurrentPage] = useState("dashboard");
+  // Read initial page from URL hash so reloads restore the correct screen.
+  const VALID_PAGES = ["dashboard","esg","profile","forecast","history","integration","report","co2","account","docs","pricing","admin"];
+  const getInitialPage = () => {
+    const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
+    return VALID_PAGES.includes(hash) ? hash : "dashboard";
+  };
+  const [currentPage, setCurrentPage] = useState(getInitialPage);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -620,6 +627,17 @@ export default function App() {
     } catch (err) {
       setError(err.message || "Gagal mengubah status share.");
     }
+  }
+
+  async function handleBrandingUpdate(companyName, logoFile) {
+    const resp = await updateBranding(companyName, logoFile);
+    // Patch currentUser so the preview image refreshes immediately
+    setCurrentUser(prev => ({
+      ...prev,
+      company_name: resp.company_name || companyName,
+      company_logo_url: resp.company_logo_url || prev?.company_logo_url,
+    }));
+    return resp;
   }
 
   async function handleCancelSubscription() {
@@ -1145,6 +1163,10 @@ export default function App() {
 
   function handleNavigate(page) {
     setCurrentPage(page);
+    // Persist page in URL hash so browser reload restores the same page
+    if (typeof window !== "undefined") {
+      window.location.hash = page;
+    }
     if (typeof window !== "undefined" && window.innerWidth <= 980) {
       setIsSidebarOpen(false);
     }
@@ -1637,7 +1659,6 @@ export default function App() {
             />
           )}
 
-          {currentPage === "esg" && <ESGSection planTier={notificationPreference.plan_tier} />}
           {currentPage === "report" && <ReportSection planTier={notificationPreference.plan_tier} profiles={profiles} />}
           {currentPage === "co2" && <CO2TrackerSection planTier={notificationPreference.plan_tier} profiles={profiles} />}
           {currentPage === "account" && (
@@ -1656,6 +1677,7 @@ export default function App() {
               onToggleESGShare={handleToggleESGShare}
               onCancelSubscription={handleCancelSubscription}
               onNavigate={handleNavigate}
+              onBrandingUpdate={handleBrandingUpdate}
             />
           )}
 
@@ -1663,7 +1685,11 @@ export default function App() {
             <AdminSection />
           )}
 
-          {currentPage === "docs" && <DocsSection />}
+          {currentPage === "docs" && (
+            <div style={{ gridColumn: '1 / -1' }}>
+              <DocsSection />
+            </div>
+          )}
         </div>
 
         {showOnboardingModal && (

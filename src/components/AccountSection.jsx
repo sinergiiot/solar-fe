@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FiKey, FiPlus, FiTrash2, FiFileText, FiImage } from "react-icons/fi";
-import { updateBranding } from "../api";
+import { API_BASE_URL } from "../api";
 import TierBadge from "./TierBadge";
 
 // AccountSection renders account info and notification preference form.
@@ -18,7 +18,8 @@ export default function AccountSection({
   onDeleteAPIKey,
   onToggleESGShare,
   onCancelSubscription,
-  onNavigate
+  onNavigate,
+  onBrandingUpdate,
 }) {
   const [newKeyName, setNewKeyName] = useState("");
   const [generatedKey, setGeneratedKey] = useState("");
@@ -50,9 +51,11 @@ export default function AccountSection({
     setIsSavingBranding(true);
     setBrandingFeedback("");
     try {
-      const resp = await updateBranding(companyName, logoFile);
+      if (onBrandingUpdate) {
+        await onBrandingUpdate(companyName, logoFile);
+      }
       setBrandingFeedback("Branding berhasil disimpan.");
-      // Ideally update currentUser but a refresh works or just let it be.
+      setLogoFile(null);
     } catch (err) {
       setBrandingFeedback("Gagal menyimpan: " + err.message);
     } finally {
@@ -211,7 +214,11 @@ export default function AccountSection({
             {currentUser?.company_logo_url && !logoFile && (
                <div style={{ marginTop: '8px' }}>
                  <span style={{ fontSize: '0.85rem', color: 'var(--muted)', display: 'block', marginBottom: '8px' }}>Logo saat ini:</span>
-                 <img src={currentUser.company_logo_url} alt="Current logo" style={{ maxHeight: '60px', borderRadius: '8px', border: '1px solid var(--line)' }} />
+                 <img 
+                   src={`${API_BASE_URL}${currentUser.company_logo_url}`} 
+                   alt="Company Logo" 
+                   style={{ maxHeight: '60px', borderRadius: '8px', border: '1px solid var(--line)' }} 
+                 />
                </div>
             )}
 
@@ -263,7 +270,8 @@ export default function AccountSection({
                   color: 'var(--primary)',
                   fontWeight: '600',
                   wordBreak: 'break-all',
-                  justifyContent: 'space-between'
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap'
                 }}>
                   <span>{`${window.location.origin}/public/esg/${currentUser.esg_share_token}`}</span>
                   <button 
@@ -351,8 +359,8 @@ export default function AccountSection({
           {isLoadingAPIKeys ? (
             <div className='empty-state'>Memuat API Keys...</div>
           ) : apiKeys.length > 0 ? (
-            <div className='history-table'>
-              <table>
+            <div className='history-table' style={{ overflowX: 'auto', display: 'block' }}>
+              <table style={{ minWidth: '600px', width: '100%' }}>
                 <thead>
                   <tr>
                     <th>Nama</th>

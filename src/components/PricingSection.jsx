@@ -124,7 +124,7 @@ export default function PricingSection({ onUpgrade, currentTier = 'free' }) {
       {/* ── Grid 3 Kolom ── */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
         gap: '14px',
         marginBottom: '20px',
         alignItems: 'start',
@@ -327,7 +327,7 @@ export default function PricingSection({ onUpgrade, currentTier = 'free' }) {
         <h3 style={{ margin: '0 0 16px', fontFamily: '"Space Grotesk",sans-serif', fontSize: '0.95rem', color: 'var(--text)' }}>
           Pertanyaan Umum
         </h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
           {FAQ.map((item, i) => (
             <div key={i} style={{
               padding: '12px 14px',

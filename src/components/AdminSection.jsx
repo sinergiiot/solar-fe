@@ -58,6 +58,9 @@ export default function AdminSection() {
   const [error, setError] = useState("");
   const [updatingID, setUpdatingID] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [dismissedAnomalies, setDismissedAnomalies] = useState(new Set());
+
+  const visibleAnomalies = anomalies.filter((_, i) => !dismissedAnomalies.has(i));
 
   useEffect(() => {
     loadData();
@@ -378,9 +381,9 @@ export default function AdminSection() {
 
       {activeTab === "intelligence" && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: '24px', marginBottom: '32px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', marginBottom: '32px' }}>
              {/* Aggregated Trends */}
-             <section className='admin-table-panel' style={{ background: 'white', padding: '24px' }}>
+             <section className='admin-table-panel' style={{ background: 'white', padding: '24px', flex: '1 1 500px', minWidth: 0 }}>
                 <div className='admin-table-header'>
                   <div style={{ marginBottom: '20px' }}>
                     <span className='panel-kicker'>Growth & Accuracy</span>
@@ -411,7 +414,7 @@ export default function AdminSection() {
                 </div>
              </section>
 
-             <div className="stack" style={{ gap: '24px' }}>
+             <div className="stack" style={{ gap: '24px', flex: '1 1 300px' }}>
                 {/* Weather API Health */}
                 <section className='admin-table-panel' style={{ background: 'white', padding: '24px' }}>
                   <div className='admin-table-header' style={{ marginBottom: '16px' }}>
@@ -564,30 +567,80 @@ export default function AdminSection() {
         </section>
       )}
 
-      {activeTab === "quality" && (
+        {activeTab === "quality" && (
         <>
           {/* Anomaly Alerts at Top */}
           {anomalies.length > 0 && (
             <div className="anomaly-pane" style={{ marginBottom: '32px' }}>
-              <div className="banner banner-error" style={{ padding: '20px', borderRadius: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b' }}>
-                  <FiAlertTriangle style={{ fontSize: '1.2rem' }} />
-                  <strong style={{ fontSize: '1.1rem' }}>Anomali Data Terdeteksi ({anomalies.length})</strong>
+              <div style={{ padding: '20px', borderRadius: '16px', background: '#fff5f5', border: '2px solid #fecaca', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#991b1b' }}>
+                    <FiAlertTriangle style={{ fontSize: '1.2rem', minWidth: '24px' }} />
+                    <strong style={{ fontSize: '1.1rem' }}>Anomali Data Terdeteksi ({visibleAnomalies.length})</strong>
+                  </div>
+                  {visibleAnomalies.length > 0 && (
+                    <button 
+                      className="secondary-button"
+                      style={{ fontSize: '0.78rem', padding: '4px 12px', color: '#991b1b', borderColor: '#fca5a5' }}
+                      onClick={() => setDismissedAnomalies(new Set(anomalies.map((_, i) => i)))}
+                    >
+                      Tutup Semua
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
-                  {anomalies.map((a, i) => (
-                    <div key={i} style={{ background: 'rgba(255,255,255,0.5)', padding: '12px', borderRadius: '12px', fontSize: '0.85rem' }}>
-                      <div style={{ fontWeight: 700 }}>{a.site_name}</div>
-                      <div style={{ opacity: 0.7 }}>Actual: <strong>{a.actual.toFixed(2)}</strong> vs Pred: {a.predicted.toFixed(2)}</div>
-                      <div style={{ color: '#991b1b', marginTop: '4px', fontWeight: 600 }}>Ratio: {(a.ratio).toFixed(1)}x over limit</div>
+                {visibleAnomalies.length === 0 ? (
+                  <div style={{ textAlign: 'center', color: '#15803d', fontWeight: 600, padding: '12px', background: '#f0fdf4', borderRadius: '10px' }}>
+                    ✓ Semua anomali telah ditangani / ditutup sesi ini.
+                  </div>
+                ) : (
+                  <>
+                    <p style={{ fontSize: '0.85rem', margin: 0, color: '#7f1d1d' }}>
+                      Data aktual melebihi batas toleransi model prediksi. Tindakan: periksa sensor inverter di lapangan, pastikan tidak ada pembacaan meter yang keliru, atau lakukan re-kalibrasi baseline cuaca.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '10px', maxHeight: '280px', overflowY: 'auto' }}>
+                      {anomalies.map((a, i) => {
+                        if (dismissedAnomalies.has(i)) return null;
+                        return (
+                          <div key={i} style={{ background: 'white', padding: '14px', borderRadius: '12px', fontSize: '0.85rem', border: '1px solid #fca5a5', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 700, color: '#1c1b1a' }}>{a.site_name}</span>
+                              <button
+                                title="Tandai Selesai / Tutup"
+                                onClick={() => setDismissedAnomalies(prev => new Set([...prev, i]))}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: '6px', color: '#991b1b', fontSize: '0.9rem', lineHeight: 1 }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                            <div style={{ color: '#6b6257' }}>Actual: <strong>{a.actual.toFixed(2)}</strong> kWh | Pred: {a.predicted.toFixed(2)} kWh</div>
+                            <div style={{ color: '#b91c1c', fontWeight: 600 }}>Deviasi: {(a.ratio).toFixed(1)}x batas normal</div>
+                            <div style={{ display: 'flex', gap: '6px', marginTop: '4px', flexWrap: 'wrap' }}>
+                              <button 
+                                className="secondary-button"
+                                style={{ fontSize: '0.72rem', padding: '3px 8px', background: '#fff', borderColor: '#fca5a5', color: '#991b1b' }}
+                                onClick={() => window.open(`mailto:?subject=Anomali Data ${a.site_name}&body=Ditemukan anomali produksi di site ${a.site_name}. Deviasi: ${a.ratio.toFixed(1)}x dari prediksi.`)}
+                              >
+                                Lapor via Email
+                              </button>
+                              <button 
+                                className="secondary-button"
+                                style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                                onClick={() => setDismissedAnomalies(prev => new Set([...prev, i]))}
+                              >
+                                Tandai Selesai
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ))}
-                </div>
+                  </>
+                )}
               </div>
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
              {/* Quality Table */}
              <section className='admin-table-panel'>
                 <div className='admin-table-header'>

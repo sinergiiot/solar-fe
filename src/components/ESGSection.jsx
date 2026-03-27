@@ -109,7 +109,7 @@ export default function ESGSection({ planTier }) {
             <span className='panel-kicker' style={{ color: 'var(--green-dark)' }}>Sustainability Portfolio</span>
             <h2 style={{ color: 'var(--green-dark)', margin: 0 }}>Environmental Impact Dashboard</h2>
           </div>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             {/* Share Control */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'white', padding: '6px 12px', borderRadius: '12px', border: '1px solid var(--line)' }}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
