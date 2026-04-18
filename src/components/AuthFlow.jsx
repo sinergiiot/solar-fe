@@ -43,6 +43,11 @@ export default function AuthFlow({
   loginForm,
   setLoginForm,
   handleLogin,
+  verifyForm,
+  setVerifyForm,
+  pendingVerificationEmail,
+  handleVerifyEmail,
+  handleResendVerification,
   simCapacity,
   setSimCapacity,
   simCloudCover,
@@ -197,6 +202,64 @@ export default function AuthFlow({
                 Daftar gratis
               </button>
             </p>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Verify Email page ──────────────────────────────────────────────────
+  if (authPage === "verify-email") {
+    return (
+      <div className='shell landing-shell auth-subpage'>
+        <div className='backdrop backdrop-left' />
+        <div className='backdrop backdrop-right' />
+        <div className='auth-subpage-wrap'>
+          <button
+            className='auth-back-btn'
+            type='button'
+            onClick={() => {
+              setError("");
+              setFeedback("");
+              setAuthPage("register");
+            }}>
+            <FiArrowLeft /> Kembali
+          </button>
+          {(error || feedback) && (
+            <div className={`banner ${error ? "banner-error" : "banner-success"}${feedbackFading && !error ? " banner-fading" : ""}`}>
+              <span>{error || feedback}</span>
+              <button className='banner-close' type='button' onClick={() => (error ? setError("") : setFeedback(""))} aria-label='Tutup'>
+                ×
+              </button>
+            </div>
+          )}
+          <section className='panel auth-subpage-card'>
+            <div className='panel-heading'>
+              <p className='eyebrow'>Email Verification</p>
+              <h2>Masukkan Kode OTP</h2>
+              <p className='hero-copy' style={{ marginTop: 6 }}>
+                Kami sudah mengirim kode verifikasi ke {verifyForm.email || pendingVerificationEmail || "email Anda"}.
+              </p>
+            </div>
+            <form className='stack' onSubmit={handleVerifyEmail}>
+              <label>
+                <span>Email</span>
+                <input type='email' value={verifyForm.email} onChange={(e) => setVerifyForm({ ...verifyForm, email: e.target.value })} placeholder='tim-energy@company.com' required />
+              </label>
+              <label>
+                <span>Kode OTP (6 Digit)</span>
+                <input type='text' value={verifyForm.code} onChange={(e) => setVerifyForm({ ...verifyForm, code: e.target.value.replace(/\D/g, "") })} placeholder='000000' maxLength={6} required />
+              </label>
+              <button className='primary-button' disabled={isAuthLoading} type='submit'>
+                {isAuthLoading ? "Memverifikasi..." : "Verifikasi Email"}
+              </button>
+            </form>
+            <div className='auth-subpage-switch'>
+              Tidak menerima kode?{" "}
+              <button type='button' className='link-btn' disabled={isAuthLoading} onClick={handleResendVerification}>
+                Kirim Ulang OTP
+              </button>
+            </div>
           </section>
         </div>
       </div>

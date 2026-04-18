@@ -374,7 +374,7 @@ export function deleteAPIKey(keyID) {
   });
 }
 
-// initiateCheckout starts a Midtrans payment session for Pro/Enterprise tier.
+// initiateCheckout starts a payment session for Pro/Enterprise tier.
 export function initiateCheckout(planTier) {
   return request("/billing/checkout", {
     method: "POST",
@@ -404,11 +404,11 @@ export async function updateBranding(companyName, logoFile) {
   const response = await fetch(`${API_BASE_URL}/users/me/branding`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${token}`
+      Authorization: `Bearer ${token}`,
     },
     body: formData,
   });
-  
+
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
@@ -462,47 +462,51 @@ export function getESGSummary(params = {}) {
 export function downloadESGReportPDF(params = {}) {
   const token = getStoredToken();
   const url = `${API_BASE_URL}/report/esg/pdf${buildQueryString(params)}`;
-  
+
   return fetch(url, {
     headers: {
-      "Authorization": `Bearer ${token}`
-    }
-  }).then(res => {
-    if (!res.ok) throw new Error("Gagal download report");
-    return res.blob();
-  }).then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `ESG_Report_${params.year || ""}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  });
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Gagal download report");
+      return res.blob();
+    })
+    .then((blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ESG_Report_${params.year || ""}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    });
 }
 
 export function downloadHistoryCSV(params = {}) {
   const token = getStoredToken();
   const url = `${API_BASE_URL}/report/history/csv${buildQueryString(params)}`;
-  
+
   return fetch(url, {
     headers: {
-      "Authorization": `Bearer ${token}`
-    }
-  }).then(res => {
-    if (!res.ok) throw new Error("Gagal download CSV");
-    return res.blob();
-  }).then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `History_Export_${params.start_date || ""}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-  });
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((res) => {
+      if (!res.ok) throw new Error("Gagal download CSV");
+      return res.blob();
+    })
+    .then((blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `History_Export_${params.start_date || ""}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    });
 }
 
 // ESG Public Share (E5-T6)

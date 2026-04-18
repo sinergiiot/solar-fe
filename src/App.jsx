@@ -126,6 +126,7 @@ const emptyNotificationPreference = {
 };
 
 const onboardingModalSnoozeMs = 24 * 60 * 60 * 1000;
+const paymentPendingStorageKey = "solar_forecast_payment_pending";
 
 // App renders auth and dashboard flows with user-separated data.
 export default function App() {
@@ -201,7 +202,7 @@ export default function App() {
   const [feedbackFading, setFeedbackFading] = useState(false);
   const [error, setError] = useState("");
   // Read initial page from URL hash so reloads restore the correct screen.
-  const VALID_PAGES = ["dashboard","esg","profile","forecast","history","integration","report","co2","account","docs","pricing","admin"];
+  const VALID_PAGES = ["dashboard", "esg", "profile", "forecast", "history", "integration", "report", "co2", "account", "docs", "pricing", "admin"];
   const getInitialPage = () => {
     const hash = typeof window !== "undefined" ? window.location.hash.replace("#", "") : "";
     return VALID_PAGES.includes(hash) ? hash : "dashboard";
@@ -210,9 +211,23 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isPaymentSyncPending, setIsPaymentSyncPending] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(paymentPendingStorageKey) === "1";
+  });
   const feedbackTimeoutRef = useRef(null);
   const feedbackFadeRef = useRef(null);
   const logoutTimeoutRef = useRef(null);
+
+  function markPaymentSyncPending(isPending) {
+    setIsPaymentSyncPending(isPending);
+    if (typeof window === "undefined") return;
+    if (isPending) {
+      window.localStorage.setItem(paymentPendingStorageKey, "1");
+      return;
+    }
+    window.localStorage.removeItem(paymentPendingStorageKey);
+  }
 
   useEffect(() => {
     if (!token) {
@@ -282,24 +297,80 @@ export default function App() {
   useEffect(() => {
     if (!token) return;
 
-    // Handle Midtrans redirect params
+    // Handle payment redirect params from gateway callback.
     const params = new URLSearchParams(window.location.search);
-    const status = params.get("transaction_status");
-    const orderID = params.get("order_id");
+    const status = (params.get("transaction_status") || params.get("payment") || params.get("status") || params.get("result") || "").toLowerCase();
 
-    if (status === "settlement" || status === "capture") {
+    if (status === "settlement" || status === "capture" || status === "success") {
       setFeedback("Pembayaran berhasil! Mengaktifkan paket Pro Anda...");
-      // Proactively reload to trigger the backend status check
-      loadAuthenticatedDashboard();
-      loadNotificationPreference();
-      // Clean up URL
+      markPaymentSyncPending(true);
       window.history.replaceState({}, document.title, "/dashboard");
     } else if (status === "pending") {
       setFeedback("Menunggu pembayaran Anda...");
-    } else if (status === "error" || status === "failure") {
+      markPaymentSyncPending(true);
+      window.history.replaceState({}, document.title, "/dashboard");
+    } else if (status === "error" || status === "failure" || status === "cancel") {
       setError("Terjadi kesalahan pada pembayaran Anda.");
+      markPaymentSyncPending(false);
+      window.history.replaceState({}, document.title, "/dashboard");
     }
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !isPaymentSyncPending) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    let pollID = null;
+    let attempts = 0;
+
+    const stopPolling = () => {
+      if (pollID) {
+        window.clearInterval(pollID);
+        pollID = null;
+      }
+    };
+
+    const syncSubscription = async () => {
+      attempts += 1;
+      try {
+        const sub = await getSubscriptionStatus();
+        const tier = (sub?.plan_tier || "").toLowerCase();
+        const subStatus = (sub?.status || "").toLowerCase();
+
+        if (isCancelled) return;
+
+        if (subStatus === "active" && tier !== "" && tier !== "free") {
+          markPaymentSyncPending(false);
+          setFeedback("Pembayaran berhasil! Paket Anda sudah aktif.");
+          stopPolling();
+          loadNotificationPreference();
+          loadAuthenticatedDashboard();
+          return;
+        }
+
+        // Stop polling after 3 minutes to avoid unnecessary traffic.
+        if (attempts >= 12) {
+          setFeedback("Pembayaran diterima. Aktivasi paket sedang diproses, mohon tunggu sebentar.");
+          stopPolling();
+        }
+      } catch {
+        if (attempts >= 12) {
+          setFeedback("Aktivasi paket masih menunggu konfirmasi. Coba beberapa saat lagi.");
+          stopPolling();
+        }
+      }
+    };
+
+    syncSubscription();
+    pollID = window.setInterval(syncSubscription, 5000);
+
+    return () => {
+      isCancelled = true;
+      stopPolling();
+    };
+  }, [token, isPaymentSyncPending]);
 
   useEffect(() => {
     if (!feedback) {
@@ -372,10 +443,7 @@ export default function App() {
       // Load summary and dashboard snapshot data (fixed scope)
       try {
         await loadNotificationPreference(); // Refresh tier
-        const [summaryData, recData] = await Promise.all([
-          getDashboardSummary(),
-          getRECReadiness().catch(() => null),
-        ]);
+        const [summaryData, recData] = await Promise.all([getDashboardSummary(), getRECReadiness().catch(() => null)]);
         setSummary(summaryData);
         if (recData) setRecReadiness(recData);
       } catch {
@@ -618,10 +686,10 @@ export default function App() {
     try {
       if (enabled) {
         const res = await enableESGShare();
-        setCurrentUser(prev => ({ ...prev, esg_share_enabled: true, esg_share_token: res.token }));
+        setCurrentUser((prev) => ({ ...prev, esg_share_enabled: true, esg_share_token: res.token }));
       } else {
         await disableESGShare();
-        setCurrentUser(prev => ({ ...prev, esg_share_enabled: false }));
+        setCurrentUser((prev) => ({ ...prev, esg_share_enabled: false }));
       }
       setFeedback(enabled ? "ESG Public Share diaktifkan!" : "ESG Public Share dinonaktifkan.");
     } catch (err) {
@@ -632,7 +700,7 @@ export default function App() {
   async function handleBrandingUpdate(companyName, logoFile) {
     const resp = await updateBranding(companyName, logoFile);
     // Patch currentUser so the preview image refreshes immediately
-    setCurrentUser(prev => ({
+    setCurrentUser((prev) => ({
       ...prev,
       company_name: resp.company_name || companyName,
       company_logo_url: resp.company_logo_url || prev?.company_logo_url,
@@ -649,7 +717,7 @@ export default function App() {
       await cancelSubscription();
       // Reload sub status & pref
       const sub = await getSubscriptionStatus();
-      setNotificationPreference(prev => ({ ...prev, plan_tier: sub.plan_tier, plan_expires_at: sub.expires_at }));
+      setNotificationPreference((prev) => ({ ...prev, plan_tier: sub.plan_tier, plan_expires_at: sub.expires_at }));
       setFeedback("Langganan berhasil dibatalkan. Paket Anda kini kembali ke FREE.");
     } catch (err) {
       setError(err.message || "Gagal membatalkan langganan.");
@@ -932,7 +1000,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (token && currentUser && currentPage === 'history') {
+    if (token && currentUser && currentPage === "history") {
       loadHistoryData();
     }
   }, [historyPage]);
@@ -1149,12 +1217,15 @@ export default function App() {
       setFeedback(`Sedang menyiapkan pembayaran untuk paket ${tier.toUpperCase()}...`);
       const res = await initiateCheckout(tier);
       if (res && res.checkout_url) {
-        window.open(res.checkout_url, '_blank');
-        setFeedback(`Halaman pembayaran untuk paket ${tier.toUpperCase()} telah dibuka di tab baru.`);
+        markPaymentSyncPending(true);
+        // Open checkout in a new tab so app can keep polling activation status.
+        window.open(res.checkout_url, "_blank", "noopener,noreferrer");
+        setFeedback(`Halaman pembayaran untuk paket ${tier.toUpperCase()} telah dibuka. Silakan selesaikan pembayaran lalu kembali ke tab ini.`);
+        setIsLoading(false);
+        return;
       } else {
         throw new Error("Gagal mendapatkan link pembayaran.");
       }
-      setIsLoading(false);
     } catch (err) {
       setError(err.message);
       setIsLoading(false);
@@ -1400,7 +1471,7 @@ export default function App() {
           <h1 className='sidebar-title'>Solar Forecast</h1>
           {/* <p className='sidebar-subtitle'>Forecast</p> */}
           <p className='sidebar-subtitle'>by Sinergi IoT Nusantara</p>
-          <div style={{ marginTop: '8px' }}>
+          <div style={{ marginTop: "8px" }}>
             <TierBadge tier={notificationPreference?.plan_tier} />
           </div>
           <button className='sidebar-close-button' type='button' onClick={() => setIsSidebarOpen(false)} aria-label='Tutup menu'>
@@ -1471,7 +1542,7 @@ export default function App() {
           </button>
           <button className={`nav-item ${currentPage === "pricing" ? "active" : ""}`} onClick={() => handleNavigate("pricing")}>
             <span className='nav-icon'>
-              <FiZap style={{ color: 'var(--success)' }} />
+              <FiZap style={{ color: "var(--success)" }} />
             </span>
             <span className='nav-label'>Upgrade & Pricing</span>
           </button>
@@ -1502,7 +1573,7 @@ export default function App() {
             <FiMenu />
           </button>
           <div>
-            <div className='page-eyebrow' style={{ display: 'flex', alignItems: 'center' }}>
+            <div className='page-eyebrow' style={{ display: "flex", alignItems: "center" }}>
               {currentUser?.name || "User"}
               <TierBadge tier={notificationPreference?.plan_tier} onClick={() => handleNavigate("pricing")} />
             </div>
@@ -1554,19 +1625,12 @@ export default function App() {
           )}
 
           {currentPage === "pricing" && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <PricingSection 
-                currentTier={notificationPreference.plan_tier}
-                onUpgrade={handleUpgrade}
-              />
+            <div style={{ gridColumn: "1 / -1" }}>
+              <PricingSection currentTier={notificationPreference.plan_tier} onUpgrade={handleUpgrade} />
             </div>
           )}
 
-          {currentPage === "esg" && (
-            <ESGSection 
-              planTier={notificationPreference.plan_tier} 
-            />
-          )}
+          {currentPage === "esg" && <ESGSection planTier={notificationPreference.plan_tier} />}
 
           {currentPage === "profile" && (
             <ProfileSection
@@ -1681,12 +1745,10 @@ export default function App() {
             />
           )}
 
-          {currentPage === "admin" && currentUser?.role === "admin" && (
-            <AdminSection />
-          )}
+          {currentPage === "admin" && currentUser?.role === "admin" && <AdminSection />}
 
           {currentPage === "docs" && (
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ gridColumn: "1 / -1" }}>
               <DocsSection />
             </div>
           )}
